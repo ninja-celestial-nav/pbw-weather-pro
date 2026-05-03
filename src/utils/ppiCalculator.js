@@ -90,21 +90,25 @@ export function calculatePPI(weather) {
   const heatScore = calcHeatScore(feels_like);
   const groundScore = calcGroundScore(humidity, dew_point, temp, rain_mm);
 
-  // A7: Thunderstorm instant kill
-  if (is_thunder && pop > 30) {
-    const thunderScore = Math.min(10, windScore * 0.1);
-    return {
-      score: Math.round(thunderScore),
-      category: 'Unplayable',
-      color: '#ef4444',
-      windScore: Math.round(windScore),
-      rainScore: 0,
-      cloudScore: Math.round(cloudScore),
-      heatScore: Math.round(heatScore),
-      groundScore: Math.round(groundScore),
-      isThunder: true,
-      advice: '⚡ 雷暴警告！請勿在開放場地活動',
-    };
+  // A7: Thunderstorm handling — 3-tier system
+  // Taiwan summer CWA常報「短暫陣雨或雷雨」，PoP 30-40% 很常見，不能直接歸零
+  let thunderPenalty = 0;
+  let thunderLevel = 'none'; // 'none' | 'watch' | 'warning' | 'danger'
+  if (is_thunder) {
+    if (pop > 70) {
+      // 🔴 高機率雷暴 — 強烈不建議
+      thunderPenalty = 0.7; // 扣 70%
+      thunderLevel = 'danger';
+    } else if (pop > 50) {
+      // 🟠 中機率雷暴 — 注意
+      thunderPenalty = 0.3; // 扣 30%
+      thunderLevel = 'warning';
+    } else if (pop > 30) {
+      // 🟡 低機率雷暴 — 留意天氣變化
+      thunderPenalty = 0.15; // 扣 15%
+      thunderLevel = 'watch';
+    }
+    // PoP <= 30% 的雷暴預報幾乎只是「可能性」，不扣分
   }
 
   // Calculate weighted score
@@ -117,6 +121,11 @@ export function calculatePPI(weather) {
 
   // Ground wetness modifier
   if (is_ground_wet) score = Math.min(score, 30);
+
+  // Apply thunder penalty (percentage reduction, not instant kill)
+  if (thunderPenalty > 0) {
+    score = score * (1 - thunderPenalty);
+  }
 
   score = Math.round(Math.max(0, Math.min(100, score)));
 
@@ -138,6 +147,15 @@ export function calculatePPI(weather) {
     advice = '⛔ 不適合打球！請改日再戰';
   }
 
+  // Append thunder-specific advice
+  if (thunderLevel === 'danger') {
+    advice += ' ⚡ 雷暴高風險！強烈建議改期';
+  } else if (thunderLevel === 'warning') {
+    advice += ' ⚡ 有雷暴風險，隨時注意天氣變化';
+  } else if (thunderLevel === 'watch') {
+    advice += ' ⛅ 有雷陣雨機會，建議帶傘出門';
+  }
+
   return {
     score, category, color,
     windScore: Math.round(windScore),
@@ -146,6 +164,7 @@ export function calculatePPI(weather) {
     heatScore: Math.round(heatScore),
     groundScore: Math.round(groundScore),
     isThunder: is_thunder,
+    thunderLevel,
     advice,
   };
 }
