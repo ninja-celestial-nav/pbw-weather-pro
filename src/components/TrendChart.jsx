@@ -1,4 +1,5 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, ComposedChart, Line } from 'recharts';
+import { MiniWeatherIcon } from './WeatherSummary';
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -7,7 +8,12 @@ function CustomTooltip({ active, payload, label }) {
 
   return (
     <div className="bg-slate-800/95 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-xl text-xs">
-      <p className="text-white font-semibold mb-2">{label}</p>
+      <div className="flex items-center gap-2 mb-2">
+        <MiniWeatherIcon code={d.weather_code} size={16} />
+        <span className="text-white font-semibold">{label}</span>
+        {d.is_thunder && <span className="text-amber-400 text-[9px]">⚡</span>}
+      </div>
+      <p className="text-[10px] text-slate-400 mb-1.5">{d.weather_text}</p>
       <div className="space-y-1.5">
         <div className="flex justify-between gap-6">
           <span className="text-slate-400">PPI</span>
@@ -34,30 +40,47 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
+/** B5: Custom X-axis tick with weather icon */
+function WeatherTick({ x, y, payload, data }) {
+  const entry = data?.find(d => d.time === payload.value);
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {entry && (
+        <foreignObject x={-10} y={-20} width={20} height={20}>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <MiniWeatherIcon code={entry.weather_code} size={14} />
+          </div>
+        </foreignObject>
+      )}
+      <text x={0} y={4} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={10}>
+        {payload.value}
+      </text>
+    </g>
+  );
+}
+
 export default function TrendChart({ data }) {
   if (!data?.length) return null;
 
   return (
-    <div className="w-full h-[260px]">
+    <div className="w-full h-[280px]">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+        <ComposedChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
           <defs>
             <linearGradient id="ppiGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4}/>
               <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
-            </linearGradient>
-            <linearGradient id="windGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)"/>
           <XAxis
             dataKey="time"
             stroke="rgba(255,255,255,0.2)"
-            fontSize={11}
+            fontSize={10}
             tickLine={false}
             axisLine={{stroke: 'rgba(255,255,255,0.06)'}}
+            tick={<WeatherTick data={data} />}
+            height={40}
           />
           <YAxis
             yAxisId="ppi"

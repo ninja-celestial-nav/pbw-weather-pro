@@ -1,40 +1,39 @@
-import { Wind, CloudRain, Eye } from 'lucide-react';
+import { Wind, CloudRain, Cloud, Thermometer, Droplets } from 'lucide-react';
 
-function ScoreBar({ label, score, icon: Icon, color, iconColor }) {
-  return (
-    <div className="flex items-center gap-3">
-      <Icon size={14} className={iconColor} />
-      <div className="flex-1">
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-[11px] text-slate-400">{label}</span>
-          <span className="text-[11px] font-semibold" style={{ color }}>{Math.round(score)}</span>
-        </div>
-        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${score}%`, backgroundColor: color }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
+const metrics = [
+  { key: 'windScore', label: '風力', weight: '55%', icon: Wind, colorFrom: '#ef4444', colorTo: '#22c55e' },
+  { key: 'rainScore', label: '降雨', weight: '25%', icon: CloudRain, colorFrom: '#ef4444', colorTo: '#3b82f6' },
+  { key: 'cloudScore', label: '雲量', weight: '8%', icon: Cloud, colorFrom: '#6b7280', colorTo: '#a78bfa' },
+  { key: 'heatScore', label: '體感', weight: '7%', icon: Thermometer, colorFrom: '#ef4444', colorTo: '#f59e0b' },
+  { key: 'groundScore', label: '地面', weight: '5%', icon: Droplets, colorFrom: '#3b82f6', colorTo: '#10b981' },
+];
 
 export default function PPIBreakdown({ ppi }) {
   if (!ppi) return null;
 
-  const items = [
-    { label: '風力 (60%)', score: ppi.windScore, icon: Wind, color: '#22d3ee', iconColor: 'text-cyan-400' },
-    { label: '降雨 (30%)', score: ppi.rainScore, icon: CloudRain, color: '#60a5fa', iconColor: 'text-blue-400' },
-    { label: '雲量 (10%)', score: ppi.cloudScore, icon: Eye, color: '#a78bfa', iconColor: 'text-violet-400' },
-  ];
-
   return (
-    <div className="space-y-3">
-      <h3 className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">Score Breakdown</h3>
-      <div className="space-y-3">
-        {items.map(item => <ScoreBar key={item.label} {...item} />)}
-      </div>
+    <div className="space-y-2.5">
+      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Score Breakdown</p>
+      {metrics.map(({ key, label, weight, icon: Icon, colorTo }) => {
+        const value = ppi[key] ?? 0;
+        return (
+          <div key={key} className="flex items-center gap-2">
+            <Icon size={12} className="text-slate-500 flex-shrink-0" />
+            <span className="text-[10px] text-slate-400 w-14 flex-shrink-0">{label} ({weight})</span>
+            <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${value}%`,
+                  background: `linear-gradient(90deg, ${colorTo}80, ${colorTo})`,
+                  boxShadow: `0 0 6px ${colorTo}40`,
+                }}
+              />
+            </div>
+            <span className="text-[10px] font-semibold text-slate-300 w-7 text-right">{value}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

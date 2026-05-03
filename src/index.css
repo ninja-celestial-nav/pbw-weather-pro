@@ -39,3 +39,81 @@ body {
 ::selection {
   background: rgba(99, 102, 241, 0.3);
 }
+
+/* B3: Weather icon animations */
+@keyframes sun-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.9; }
+}
+@keyframes sun-ray {
+  0%, 100% { opacity: 0.6; transform: scaleY(1); }
+  50% { opacity: 1; transform: scaleY(1.3); }
+}
+@keyframes cloud-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+@keyframes rain-drop {
+  0% { opacity: 0; transform: translateY(-4px); }
+  50% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(8px); }
+}
+@keyframes lightning {
+  0%, 90%, 100% { opacity: 0; }
+  92%, 98% { opacity: 1; }
+  95% { opacity: 0.3; }
+}
+
+.animate-sun-pulse {
+  animation: sun-pulse 3s ease-in-out infinite;
+  transform-origin: center;
+}
+.animate-sun-ray {
+  animation: sun-ray 2s ease-in-out infinite;
+  transform-origin: center;
+}
+.animate-cloud-drift {
+  animation: cloud-drift 4s ease-in-out infinite;
+}
+.animate-rain-drop {
+  animation: rain-drop 1s ease-in-out infinite;
+}
+.animate-lightning {
+  animation: lightning 3s ease-in-out infinite;
+}
+
+/* A7: Thunderstorm banner slow pulse */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+/* B8: Mobile swipe-friendly horizontal scroll */
+@media (max-width: 768px) {
+  .grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .lg\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .lg\:grid-cols-5 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Smooth page transitions */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Best time bar horizontal scroll */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
