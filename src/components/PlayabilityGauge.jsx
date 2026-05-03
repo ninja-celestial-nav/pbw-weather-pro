@@ -12,7 +12,6 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
     function animate(now) {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setAnimatedScore(Math.round(start + diff * eased));
       if (progress < 1) requestAnimationFrame(animate);
@@ -22,92 +21,124 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
   }, [score]);
 
   // SVG gauge parameters
-  const cx = 140, cy = 130;
-  const radius = 100;
-  const startAngle = -210;
-  const endAngle = 30;
+  const cx = 150, cy = 140;
+  const radius = 110;
+  const startAngle = -210; // bottom-left
+  const endAngle = 30;     // bottom-right
   const totalArc = endAngle - startAngle; // 240 degrees
   const scoreAngle = startAngle + (animatedScore / 100) * totalArc;
 
   const degToRad = (d) => (d * Math.PI) / 180;
 
-  // Create arc path
-  function arcPath(r, start, end) {
-    const s = degToRad(start);
-    const e = degToRad(end);
+  // Arc segment colors for accurate gauge coloring
+  const segments = [
+    { from: 0, to: 20, color: '#ef4444' },   // Red (Unplayable)
+    { from: 20, to: 35, color: '#f97316' },   // Orange (Poor)
+    { from: 35, to: 55, color: '#eab308' },   // Yellow (Fair)
+    { from: 55, to: 75, color: '#84cc16' },   // Lime (Good)
+    { from: 75, to: 90, color: '#22c55e' },   // Green (Great)
+    { from: 90, to: 100, color: '#10b981' },  // Emerald (Excellent)
+  ];
+
+  function arcPath(r, startDeg, endDeg) {
+    const s = degToRad(startDeg);
+    const e = degToRad(endDeg);
     const x1 = cx + r * Math.cos(s);
     const y1 = cy + r * Math.sin(s);
     const x2 = cx + r * Math.cos(e);
     const y2 = cy + r * Math.sin(e);
-    const large = end - start > 180 ? 1 : 0;
+    const large = (endDeg - startDeg) > 180 ? 1 : 0;
     return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
   }
 
-  // Needle tip position
-  const needleAngle = degToRad(scoreAngle);
-  const needleX = cx + (radius - 8) * Math.cos(needleAngle);
-  const needleY = cy + (radius - 8) * Math.sin(needleAngle);
+  // Needle
+  const needleRad = degToRad(scoreAngle);
+  const needleTipX = cx + (radius - 10) * Math.cos(needleRad);
+  const needleTipY = cy + (radius - 10) * Math.sin(needleRad);
+  // Needle base (triangle)
+  const baseOffset = 5;
+  const perpAngle = needleRad + Math.PI / 2;
+  const bx1 = cx + baseOffset * Math.cos(perpAngle);
+  const by1 = cy + baseOffset * Math.sin(perpAngle);
+  const bx2 = cx - baseOffset * Math.cos(perpAngle);
+  const by2 = cy - baseOffset * Math.sin(perpAngle);
 
   // Tick marks
   const ticks = [0, 20, 40, 60, 80, 100];
-  const tickColors = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e', '#10b981'];
 
-  // Glow effect intensity
-  const glowIntensity = animatedScore > 60 ? 0.6 : 0.3;
+  // Glow color based on score
+  const getGlowColor = (s) => {
+    if (s >= 80) return '#10b981';
+    if (s >= 60) return '#22c55e';
+    if (s >= 40) return '#eab308';
+    if (s >= 20) return '#f97316';
+    return '#ef4444';
+  };
+
+  const glowColor = getGlowColor(animatedScore);
 
   return (
     <div className="flex flex-col items-center">
-      <svg width="280" height="175" viewBox="0 0 280 175">
+      <svg width="100%" viewBox="0 0 300 210" style={{ maxWidth: 320 }}>
         <defs>
-          <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#ef4444" />
-            <stop offset="25%" stopColor="#f97316" />
-            <stop offset="45%" stopColor="#eab308" />
-            <stop offset="65%" stopColor="#84cc16" />
-            <stop offset="85%" stopColor="#22c55e" />
-            <stop offset="100%" stopColor="#10b981" />
-          </linearGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          <filter id="needleGlow">
+          <filter id="arcGlow">
             <feGaussianBlur stdDeviation="4" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <filter id="needleShadow">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor={glowColor} floodOpacity="0.6" />
+          </filter>
+          <filter id="scoreGlow">
+            <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor={glowColor} floodOpacity="0.3" />
+          </filter>
         </defs>
 
-        {/* Background arc */}
+        {/* Background arc track */}
         <path
           d={arcPath(radius, startAngle, endAngle)}
           fill="none"
           stroke="rgba(255,255,255,0.06)"
-          strokeWidth="20"
+          strokeWidth="22"
           strokeLinecap="round"
         />
 
-        {/* Colored arc (filled portion) */}
-        <path
-          d={arcPath(radius, startAngle, scoreAngle)}
-          fill="none"
-          stroke="url(#gaugeGrad)"
-          strokeWidth="20"
-          strokeLinecap="round"
-          filter="url(#glow)"
-          style={{ opacity: 0.9 }}
-        />
+        {/* Colored arc segments — each segment gets its own color */}
+        {segments.map((seg, i) => {
+          const segStart = startAngle + (seg.from / 100) * totalArc;
+          const segEnd = startAngle + (Math.min(seg.to, animatedScore) / 100) * totalArc;
+          if (animatedScore <= seg.from) return null;
+          return (
+            <path
+              key={i}
+              d={arcPath(radius, segStart, segEnd)}
+              fill="none"
+              stroke={seg.color}
+              strokeWidth="22"
+              strokeLinecap={i === 0 ? 'round' : 'butt'}
+              filter="url(#arcGlow)"
+              style={{ opacity: 0.9 }}
+            />
+          );
+        })}
 
-        {/* Tick marks */}
-        {ticks.map((tick, i) => {
+        {/* Round cap at the end of the filled arc */}
+        {animatedScore > 0 && (() => {
+          const endRad = degToRad(scoreAngle);
+          const capX = cx + radius * Math.cos(endRad);
+          const capY = cy + radius * Math.sin(endRad);
+          return <circle cx={capX} cy={capY} r="11" fill={glowColor} opacity="0.9" filter="url(#arcGlow)" />;
+        })()}
+
+        {/* Tick marks and labels */}
+        {ticks.map((tick) => {
           const angle = degToRad(startAngle + (tick / 100) * totalArc);
-          const outerR = radius + 18;
-          const innerR = radius + 12;
+          const outerR = radius + 20;
+          const innerR = radius + 14;
+          const labelR = outerR + 11;
+          const tickColor = tick <= animatedScore ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)';
           return (
             <g key={tick}>
               <line
@@ -115,17 +146,18 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
                 y1={cy + innerR * Math.sin(angle)}
                 x2={cx + outerR * Math.cos(angle)}
                 y2={cy + outerR * Math.sin(angle)}
-                stroke={tickColors[i]}
+                stroke={tickColor}
                 strokeWidth="2"
-                opacity="0.6"
               />
               <text
-                x={cx + (outerR + 10) * Math.cos(angle)}
-                y={cy + (outerR + 10) * Math.sin(angle)}
+                x={cx + labelR * Math.cos(angle)}
+                y={cy + labelR * Math.sin(angle)}
                 fill="rgba(255,255,255,0.35)"
-                fontSize="9"
+                fontSize="10"
+                fontWeight="500"
                 textAnchor="middle"
                 dominantBaseline="middle"
+                fontFamily="Inter, system-ui, sans-serif"
               >
                 {tick}
               </text>
@@ -133,48 +165,50 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
           );
         })}
 
-        {/* Needle */}
-        <line
-          x1={cx}
-          y1={cy}
-          x2={needleX}
-          y2={needleY}
-          stroke={color}
-          strokeWidth="3"
-          strokeLinecap="round"
-          filter="url(#needleGlow)"
+        {/* Needle — triangle shape */}
+        <polygon
+          points={`${needleTipX},${needleTipY} ${bx1},${by1} ${bx2},${by2}`}
+          fill={color}
+          filter="url(#needleShadow)"
+          opacity="0.95"
         />
-        <circle cx={cx} cy={cy} r="6" fill={color} opacity={glowIntensity + 0.3} />
-        <circle cx={cx} cy={cy} r="3" fill="white" opacity="0.9" />
 
-        {/* Score text */}
+        {/* Needle pivot */}
+        <circle cx={cx} cy={cy} r="8" fill={color} opacity="0.8" />
+        <circle cx={cx} cy={cy} r="4" fill="white" opacity="0.95" />
+
+        {/* Score number */}
         <text
           x={cx}
-          y={cy + 35}
+          y={cy + 42}
           textAnchor="middle"
           fill="white"
-          fontSize="36"
-          fontWeight="700"
+          fontSize="44"
+          fontWeight="800"
           fontFamily="Inter, system-ui, sans-serif"
+          filter="url(#scoreGlow)"
         >
           {animatedScore}
         </text>
+
+        {/* Category label */}
         <text
           x={cx}
-          y={cy + 52}
+          y={cy + 62}
           textAnchor="middle"
           fill={color}
-          fontSize="12"
-          fontWeight="600"
+          fontSize="11"
+          fontWeight="700"
           fontFamily="Inter, system-ui, sans-serif"
-          letterSpacing="1.5"
+          letterSpacing="2"
+          opacity="0.9"
         >
           {category.toUpperCase()}
         </text>
       </svg>
 
-      {/* Score breakdown mini-bar */}
-      <div className="text-[10px] text-slate-500 mt-1 tracking-wide">
+      {/* Label below */}
+      <div className="text-[10px] text-slate-500 -mt-1 tracking-widest font-medium">
         PLAYABILITY INDEX
       </div>
     </div>
