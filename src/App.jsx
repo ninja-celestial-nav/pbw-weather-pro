@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { RefreshCw, Radio, TrendingUp, Gauge, Compass, Activity, Sun, Moon } from 'lucide-react';
+import { RefreshCw, Radio, TrendingUp, Gauge, Compass, Activity, Sun, Moon, Video } from 'lucide-react';
 import { useWeatherData } from './hooks/useWeatherData';
 import LocationToggle from './components/LocationToggle';
 import TimePicker from './components/TimePicker';
@@ -15,6 +15,7 @@ import BestTimeBar from './components/BestTimeBar';
 import SkeletonLoader from './components/SkeletonLoader';
 import CrossValidationBadge from './components/CrossValidationBadge';
 import ToastContainer, { useToast } from './components/Toast';
+import LiveCameraViewer from './components/LiveCameraViewer';
 
 // C13: Lazy load the heavy chart component
 const TrendChart = lazy(() => import('./components/TrendChart'));
@@ -102,6 +103,7 @@ export default function App() {
     return null;
   });
   const [theme, setTheme] = useState(() => localStorage.getItem('pbw_theme') || 'dark');
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const {
     weather, ppi, trend, radar, location, loading, lastUpdate,
@@ -145,6 +147,12 @@ export default function App() {
     <div className={`min-h-screen transition-colors duration-500 selection:bg-indigo-500/30 ${isLight ? 'bg-gradient-to-b from-slate-50 to-blue-50/30 text-slate-800' : 'bg-[#0a0e1a] text-white'}`}>
       {/* C2: Toast container */}
       <ToastContainer toasts={toasts} />
+      <LiveCameraViewer 
+        locationId={locationId} 
+        isOpen={isCameraOpen} 
+        onClose={() => setIsCameraOpen(false)} 
+        isLight={isLight} 
+      />
 
       {/* Ambient background (dark only) */}
       {!isLight && (
@@ -191,6 +199,13 @@ export default function App() {
                 <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[9px] font-medium border border-emerald-500/20">CWA LIVE</span>
               )}
             </div>
+            <button
+              onClick={() => setIsCameraOpen(true)}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${isLight ? 'bg-white border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-500 hover:border-red-200 shadow-sm' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-red-500/20 hover:border-red-500/30'}`}
+              title="即時影像"
+            >
+              <Video size={14} className={!targetTime && dataSource === 'CWA' ? 'text-red-400 animate-pulse' : ''} />
+            </button>
             <button
               onClick={handleRefresh}
               disabled={loading}
