@@ -140,7 +140,8 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
   const omCache = useRef({});
   const location = LOCATIONS[locationId];
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (options = {}) => {
+    const force = options?.force === true;
     setLoading(true);
     setError(null);
 
@@ -154,7 +155,7 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
       const CACHE_TTL = 5 * 60 * 1000;
 
       let timeMap;
-      if (cached && cacheAge < CACHE_TTL) {
+      if (!force && cached && cacheAge < CACHE_TTL) {
         timeMap = cached.timeMap;
       } else {
         const result = await fetchCWAWeather(locationId);
@@ -169,9 +170,7 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
       if (!targetTime) {
         const obs = await fetchObservation(locationId);
         if (obs) {
-          // Apply location-specific wind factor to the raw observation station wind speed
           const obsWindSpeed = Math.round(obs.wind_speed * location.windFactor * 10) / 10;
-          // Recalculate gust based on the new factored wind speed
           const obsWindGust = estimateGust(obsWindSpeed, location.windFactor, analyzeTime.getHours());
           
           weatherData = { 
@@ -234,15 +233,32 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
           const locCached = cwaCache.current[locId];
           const locAge = locCached ? (now - locCached.fetchedAt) : Infinity;
           let locTimeMap;
-          if (locCached && locAge < CACHE_TTL) {
+          if (!force && locCached && locAge < CACHE_TTL) {
             locTimeMap = locCached.timeMap;
           } else {
             const locResult = await fetchCWAWeather(locId);
             locTimeMap = locResult.timeMap;
             cwaCache.current[locId] = { timeMap: locTimeMap, fetchedAt: now };
           }
-          const locWeather = getWeatherAtTime(locTimeMap, analyzeTime, loc.windFactor);
+          let locWeather = getWeatherAtTime(locTimeMap, analyzeTime, loc.windFactor);
+          
           if (locWeather) {
+            // Also apply real-time observation to comparison cards so they match the main gauge
+            if (!targetTime) {
+              const locObs = await fetchObservation(locId);
+              if (locObs) {
+                const obsWindSpeed = Math.round(locObs.wind_speed * loc.windFactor * 10) / 10;
+                const obsWindGust = estimateGust(obsWindSpeed, loc.windFactor, analyzeTime.getHours());
+                locWeather = {
+                  ...locWeather,
+                  rain_mm: locObs.rain_mm,
+                  wind_speed: obsWindSpeed,
+                  wind_gust: obsWindGust,
+                  isRealtimeObserved: true
+                };
+              }
+            }
+            
             const locPpi = calculatePPI(locWeather);
             // C9: Get 24hr history for sparkline
             const locHistory = getHistory(locId);
@@ -295,7 +311,7 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
   return {
     weather, ppi, trend, radar, location, loading, lastUpdate,
     dataSource, error, bestTimes, comparison, crossValidation, ppiHistory,
-    refresh: fetchData, locations: LOCATIONS,
+    refresh: () => fetchData({ force: true }), locations: LOCATIONS,
   };
 }
 
