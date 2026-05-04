@@ -121,6 +121,10 @@ export default function App() {
   // C7: Theme persistence
   useEffect(() => {
     localStorage.setItem('pbw_theme', theme);
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', theme === 'light' ? '#f8fafc' : '#0a0e1a');
+    }
   }, [theme]);
 
   // C2: Refresh with toast
