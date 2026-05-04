@@ -113,7 +113,7 @@ function findBestPlayTimes(timeMap, windFactor, baseDate) {
     const w = getWeatherAtTime(timeMap, checkTime, windFactor);
     if (w) {
       const p = calculatePPI(w);
-      results.push({ hour: h, ppi: p.score, category: p.category, color: p.color, weather: w });
+      results.push({ hour: h, targetTime: checkTime, ppi: p.score, category: p.category, color: p.color, weather: w });
     }
   }
   results.sort((a, b) => b.ppi - a.ppi);

@@ -12,15 +12,9 @@ export default function BestTimeBar({ bestTimes, trend, onSelectTime }) {
   const firstRain = trend?.find(t => t.pop > 40 || t.rain_mm > 0.3);
   const firstClear = trend?.find(t => t.pop <= 20 && t.rain_mm <= 0.1);
 
-  function handleHourClick(hour) {
-    if (onSelectTime) {
-      const now = new Date();
-      const target = new Date(now);
-      target.setHours(hour, 0, 0, 0);
-      if (hour < now.getHours()) {
-        target.setDate(target.getDate() + 1);
-      }
-      onSelectTime(target);
+  function handleHourClick(targetTime) {
+    if (onSelectTime && targetTime) {
+      onSelectTime(targetTime);
     }
   }
 
@@ -43,13 +37,13 @@ export default function BestTimeBar({ bestTimes, trend, onSelectTime }) {
 
       {/* C1: Clickable hour strip */}
       <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
-        {allHours.map(({ hour, ppi, color, category, weather }) => {
+        {allHours.map(({ hour, targetTime, ppi, color, category, weather }) => {
           const isTop = topHours.some(t => t.hour === hour);
           const isBest = best?.hour === hour;
           return (
             <button
               key={hour}
-              onClick={() => handleHourClick(hour)}
+              onClick={() => handleHourClick(targetTime)}
               className={`
                 flex-shrink-0 flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg transition-all cursor-pointer
                 hover:bg-white/[0.08] hover:scale-105 active:scale-95
