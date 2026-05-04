@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { calculatePPI } from '../utils/ppiCalculator';
-import { fetchCWAWeather, getWeatherAtTime, estimateGust } from '../api/cwaApi';
+import { fetchCWAWeather, getWeatherAtTime, estimateGust, getDiurnalFactor } from '../api/cwaApi';
 import { fetchOpenMeteo, getOpenMeteoAtTime, compareDataSources } from '../api/openMeteoApi';
 import { fetchObservation } from '../api/cwaObservation';
 
@@ -277,7 +277,7 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
         const omCached = omCache.current[locationId];
         const omAge = omCached ? (now - omCached.fetchedAt) : Infinity;
         let omHourlyMap;
-        if (omCached && omAge < CACHE_TTL) {
+        if (!force && omCached && omAge < CACHE_TTL) {
           omHourlyMap = omCached.hourlyMap;
         } else {
           const omResult = await fetchOpenMeteo(location.lat, location.lng);
@@ -285,6 +285,15 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
           omCache.current[locationId] = { hourlyMap: omHourlyMap, fetchedAt: now };
         }
         const omData = getOpenMeteoAtTime(omHourlyMap, analyzeTime);
+        
+        if (omData) {
+          // Apply the exact same court-level wind modifiers to Open-Meteo
+          const diurnalFactor = getDiurnalFactor(analyzeTime.getHours());
+          const factoredWindSpeed = Math.round(omData.wind_speed * location.windFactor * diurnalFactor * 10) / 10;
+          omData.wind_speed = factoredWindSpeed;
+          omData.wind_gust = estimateGust(factoredWindSpeed, location.windFactor, analyzeTime.getHours());
+        }
+
         const cv = compareDataSources(weatherData, omData);
         setCrossValidation(cv);
       } catch (e) {

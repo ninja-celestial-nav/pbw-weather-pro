@@ -98,6 +98,15 @@ export function estimateGust(windSpeedKmh, windFactor, hour) {
   return Math.round(windSpeedKmh * gustRatio * 10) / 10;
 }
 
+export function getDiurnalFactor(hour) {
+  if (hour >= 5 && hour <= 7) return 0.7;       // dawn calm
+  if (hour >= 8 && hour <= 10) return 0.85;     // morning building
+  if (hour >= 11 && hour <= 13) return 1.0;     // midday
+  if (hour >= 14 && hour <= 16) return 1.25;    // afternoon convection
+  if (hour >= 17 && hour <= 18) return 1.1;     // evening transition
+  return 0.75;                                  // night calm (19-4)
+}
+
 /** Improved rain estimation using WeatherCode + PoP combined */
 function estimateRainMm(weatherCodeInfo, pop) {
   const baseIntensity = weatherCodeInfo.rainIntensity;
@@ -318,13 +327,8 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
   const comfortDesc = nearestField('comfort_desc') || '';
   const rawWindSpeed = interpField('wind_speed') ?? 0;
   // C8: Diurnal wind correction — early morning calm, afternoon thermal convection
-  let diurnalFactor = 1.0;
-  if (targetHour >= 5 && targetHour <= 7) diurnalFactor = 0.7;       // dawn calm
-  else if (targetHour >= 8 && targetHour <= 10) diurnalFactor = 0.85; // morning building
-  else if (targetHour >= 11 && targetHour <= 13) diurnalFactor = 1.0; // midday
-  else if (targetHour >= 14 && targetHour <= 16) diurnalFactor = 1.25; // afternoon convection
-  else if (targetHour >= 17 && targetHour <= 18) diurnalFactor = 1.1;  // evening transition
-  else if (targetHour >= 19 || targetHour <= 4) diurnalFactor = 0.75;  // night calm
+  const diurnalFactor = getDiurnalFactor(targetHour);
+
   const windSpeed = Math.round(rawWindSpeed * windFactor * diurnalFactor * 10) / 10;
   const cloudCov = interpField('cloud_coverage') ?? 50;
   const pop = interpField('pop') ?? 0;
