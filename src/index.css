@@ -91,18 +91,7 @@ body {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
-/* B8: Mobile swipe-friendly horizontal scroll */
-@media (max-width: 768px) {
-  .grid-cols-3 {
-    grid-template-columns: 1fr !important;
-  }
-  .lg\:grid-cols-3 {
-    grid-template-columns: 1fr !important;
-  }
-  .lg\:grid-cols-5 {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
+
 
 /* Smooth page transitions */
 * {

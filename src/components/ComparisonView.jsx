@@ -14,7 +14,7 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
         <span className="text-xs font-semibold text-slate-400 tracking-wide uppercase">📍 場地比較</span>
         <span className="text-[9px] text-slate-600">即時 PPI 排名</span>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {locations.map(([locId, data]) => {
           const isActive = locId === activeLocation;
           const isBest = locId === bestLocId;
