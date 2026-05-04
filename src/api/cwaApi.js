@@ -82,7 +82,7 @@ function getWeatherCodeInfo(code) {
 }
 
 /** Dynamic gust estimation based on terrain and time of day */
-function estimateGust(windSpeedKmh, windFactor, hour) {
+export function estimateGust(windSpeedKmh, windFactor, hour) {
   // Higher gust ratio for exposed terrain and afternoon convection
   let gustRatio = 1.3; // base
 

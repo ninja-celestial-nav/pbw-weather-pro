@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { calculatePPI } from '../utils/ppiCalculator';
-import { fetchCWAWeather, getWeatherAtTime } from '../api/cwaApi';
+import { fetchCWAWeather, getWeatherAtTime, estimateGust } from '../api/cwaApi';
 import { fetchOpenMeteo, getOpenMeteoAtTime, compareDataSources } from '../api/openMeteoApi';
 import { fetchObservation } from '../api/cwaObservation';
 
@@ -101,7 +101,13 @@ function calculateRadarAnalysis(weather) {
 
 function findBestPlayTimes(timeMap, windFactor, baseDate) {
   const results = [];
+  const now = new Date();
+  const isToday = baseDate.getDate() === now.getDate();
+  const nowHour = now.getHours();
+
   for (let h = 6; h <= 21; h++) {
+    if (isToday && h < nowHour) continue; // Skip past hours today
+    
     const checkTime = new Date(baseDate);
     checkTime.setHours(h, 0, 0, 0);
     const w = getWeatherAtTime(timeMap, checkTime, windFactor);
@@ -163,7 +169,18 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
       if (!targetTime) {
         const obs = await fetchObservation(locationId);
         if (obs) {
-          weatherData = { ...weatherData, ...obs, isRealtimeObserved: true };
+          // Apply location-specific wind factor to the raw observation station wind speed
+          const obsWindSpeed = Math.round(obs.wind_speed * location.windFactor * 10) / 10;
+          // Recalculate gust based on the new factored wind speed
+          const obsWindGust = estimateGust(obsWindSpeed, location.windFactor, analyzeTime.getHours());
+          
+          weatherData = { 
+            ...weatherData, 
+            rain_mm: obs.rain_mm,
+            wind_speed: obsWindSpeed,
+            wind_gust: obsWindGust,
+            isRealtimeObserved: true 
+          };
         }
       }
 
