@@ -22,10 +22,12 @@ const TrendChart = lazy(() => import('./components/TrendChart'));
 // C4: URL state helpers
 function getUrlParams() {
   const params = new URLSearchParams(window.location.search);
+  const day = parseInt(params.get('day'));
+  const hour = parseInt(params.get('hour'));
   return {
     loc: params.get('loc') || null,
-    day: parseInt(params.get('day')) || null,
-    hour: parseInt(params.get('hour')) || null,
+    day: isNaN(day) ? null : day,
+    hour: isNaN(hour) ? null : hour,
   };
 }
 

@@ -172,10 +172,12 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
         if (obs) {
           const obsWindSpeed = Math.round(obs.wind_speed * location.windFactor * 10) / 10;
           const obsWindGust = estimateGust(obsWindSpeed, location.windFactor, analyzeTime.getHours());
+          const obsRadarEcho = obs.rain_mm > 1 ? 40 : obs.rain_mm > 0.3 ? 25 : obs.rain_mm > 0 ? 15 : 3;
           
           weatherData = { 
             ...weatherData, 
             rain_mm: obs.rain_mm,
+            radar_echo: obsRadarEcho,
             wind_speed: obsWindSpeed,
             wind_gust: obsWindGust,
             isRealtimeObserved: true 
@@ -249,9 +251,12 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
               if (locObs) {
                 const obsWindSpeed = Math.round(locObs.wind_speed * loc.windFactor * 10) / 10;
                 const obsWindGust = estimateGust(obsWindSpeed, loc.windFactor, analyzeTime.getHours());
+                const obsRadarEcho = locObs.rain_mm > 1 ? 40 : locObs.rain_mm > 0.3 ? 25 : locObs.rain_mm > 0 ? 15 : 3;
+
                 locWeather = {
                   ...locWeather,
                   rain_mm: locObs.rain_mm,
+                  radar_echo: obsRadarEcho,
                   wind_speed: obsWindSpeed,
                   wind_gust: obsWindGust,
                   isRealtimeObserved: true
