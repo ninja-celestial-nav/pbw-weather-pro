@@ -24,22 +24,24 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   
-  // Network-first for API calls
-  if (request.url.includes('/api/') || request.url.includes('/cwa-api/') || request.url.includes('open-meteo')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
+  // Skip cross-origin requests or non-GET requests if needed, but for our API proxy it's fine
+  if (request.method !== 'GET') return;
+
+  // Global Network-First strategy for both API and static assets
+  // This prevents the PWA from getting stuck on an old index.html forever
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        // Cache the latest successful response
+        if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // Cache-first for static assets
-  event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request))
+        }
+        return response;
+      })
+      .catch(() => {
+        // Fallback to cache if offline
+        return caches.match(request);
+      })
   );
 });

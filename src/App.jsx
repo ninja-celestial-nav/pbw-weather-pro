@@ -33,10 +33,12 @@ function setUrlParams(loc, targetTime) {
   const params = new URLSearchParams();
   if (loc) params.set('loc', loc);
   if (targetTime) {
-    const now = new Date();
-    const dayOffset = Math.round((targetTime.setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000*60*60*24));
+    const tHour = targetTime.getHours();
+    const tClone = new Date(targetTime);
+    const nowClone = new Date();
+    const dayOffset = Math.round((tClone.setHours(0,0,0,0) - nowClone.setHours(0,0,0,0)) / (1000*60*60*24));
     if (dayOffset >= 0) params.set('day', dayOffset);
-    params.set('hour', targetTime.getHours());
+    params.set('hour', tHour);
   }
   const qs = params.toString();
   const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;

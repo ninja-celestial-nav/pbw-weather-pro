@@ -260,7 +260,7 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
   const targetHour = targetTime.getHours();
 
   const entries = Array.from(timeMap.entries())
-    .map(([key, val]) => ({ time: new Date(key).getTime(), data: val, key }))
+    .map(([key, val]) => ({ time: new Date(key.replace(' ', 'T') + '+08:00').getTime(), data: val, key }))
     .sort((a, b) => a.time - b.time);
 
   if (entries.length === 0) return null;
