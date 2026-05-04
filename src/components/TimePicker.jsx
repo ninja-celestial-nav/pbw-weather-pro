@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Calendar, Clock, RotateCcw } from 'lucide-react';
+import { getTaipeiNow, toTaipeiDate, getTaipeiHour } from '../api/cwaApi';
 
 const DAY_LABELS = ['今天', '明天', '後天'];
 
 export default function TimePicker({ targetTime, onTimeChange }) {
-  const now = new Date();
+  const now = getTaipeiNow();
   
   // Determine current selection state
   const isNow = targetTime === null;
@@ -15,7 +16,7 @@ export default function TimePicker({ targetTime, onTimeChange }) {
   const selStart = new Date(selectedDate);
   selStart.setHours(0, 0, 0, 0);
   const selectedDayOffset = isNow ? 0 : Math.round((selStart - todayStart) / (1000 * 60 * 60 * 24));
-  const selectedHour = isNow ? now.getHours() : selectedDate.getHours();
+  const selectedHour = isNow ? getTaipeiHour(now) : getTaipeiHour(selectedDate);
 
   // Generate day options
   const days = useMemo(() => {
@@ -25,8 +26,8 @@ export default function TimePicker({ targetTime, onTimeChange }) {
       return {
         offset,
         label: DAY_LABELS[offset],
-        dateStr: `${d.getMonth() + 1}/${d.getDate()}`,
-        weekday: d.toLocaleDateString('zh-TW', { weekday: 'short' }),
+        dateStr: d.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Taipei' }),
+        weekday: d.toLocaleDateString('zh-TW', { weekday: 'short', timeZone: 'Asia/Taipei' }),
       };
     });
   }, [now.getDate()]);
@@ -41,21 +42,18 @@ export default function TimePicker({ targetTime, onTimeChange }) {
   }, []);
 
   function handleDaySelect(offset) {
-    const d = new Date(now);
-    d.setDate(d.getDate() + offset);
-    d.setHours(selectedHour, 0, 0, 0);
+    const d = toTaipeiDate(offset, selectedHour);
     // Don't allow past times for today
-    if (offset === 0 && selectedHour < now.getHours()) {
-      d.setHours(now.getHours(), 0, 0, 0);
+    const currentTaipeiHour = getTaipeiHour(now);
+    if (offset === 0 && selectedHour < currentTaipeiHour) {
+      onTimeChange(toTaipeiDate(0, currentTaipeiHour));
+    } else {
+      onTimeChange(d);
     }
-    onTimeChange(d);
   }
 
   function handleHourSelect(hour) {
-    const d = new Date(now);
-    d.setDate(d.getDate() + selectedDayOffset);
-    d.setHours(hour, 0, 0, 0);
-    onTimeChange(d);
+    onTimeChange(toTaipeiDate(selectedDayOffset, hour));
   }
 
   function handleReset() {

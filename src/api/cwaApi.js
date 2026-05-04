@@ -128,9 +128,40 @@ function estimateUV(hour, cloudCoverage) {
   return Math.round(maxUV * solarFactor * cloudFactor * 10) / 10;
 }
 
-/** Linear interpolation between two values */
-function lerp(v1, v2, t) {
-  return v1 + (v2 - v1) * t;
+/**
+ * C11: Timezone helpers to ensure consistency across sources
+ */
+export function getTaipeiNow() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+}
+
+export function toTaipeiDate(dayOffset, hour) {
+  const now = getTaipeiNow();
+  const d = new Date(now);
+  d.setDate(d.getDate() + dayOffset);
+  
+  // Format to YYYY-MM-DD
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const date = String(d.getDate()).padStart(2, '0');
+  const hourStr = String(hour).padStart(2, '0');
+  
+  // Create an absolute moment for Taipei
+  const isoStr = `${year}-${month}-${date}T${hourStr}:00:00+08:00`;
+  return new Date(isoStr);
+}
+
+export function getTaipeiHour(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Taipei',
+    hour: 'numeric',
+    hour12: false
+  });
+  return parseInt(formatter.format(date));
+}
+
+export function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
 
 /** Angle interpolation (handles 350° → 10° wrapping) */
@@ -155,97 +186,83 @@ function parseCWAData(locationData) {
 
   const timeMap = new Map();
 
-  // Temperature (hourly for first 2 days, 3-hourly after)
-  if (elements['溫度']) {
-    for (const t of elements['溫度']) {
-      const key = t.DataTime;
+  function processElement(name, fieldName, valueKey) {
+    if (!elements[name]) return;
+    for (const t of elements[name]) {
+      const key = t.DataTime || t.StartTime;
+      if (!key) continue;
       if (!timeMap.has(key)) timeMap.set(key, {});
-      timeMap.get(key).temp = parseFloat(t.ElementValue[0].Temperature);
+      const valObj = t.ElementValue[0];
+      const val = valObj[valueKey] || valObj.value;
+      if (val !== undefined && val !== null && val !== '') {
+        timeMap.get(key)[fieldName] = parseFloat(val);
+      }
     }
   }
 
-  // Apparent temperature
-  if (elements['體感溫度']) {
-    for (const t of elements['體感溫度']) {
-      const key = t.DataTime;
-      if (!timeMap.has(key)) timeMap.set(key, {});
-      timeMap.get(key).feels_like = parseFloat(t.ElementValue[0].ApparentTemperature);
-    }
-  }
-
-  // Dew point temperature
-  if (elements['露點溫度']) {
-    for (const t of elements['露點溫度']) {
-      const key = t.DataTime;
-      if (!timeMap.has(key)) timeMap.set(key, {});
-      timeMap.get(key).dew_point = parseFloat(t.ElementValue[0].DewPoint);
-    }
-  }
-
-  // Humidity
-  if (elements['相對濕度']) {
-    for (const t of elements['相對濕度']) {
-      const key = t.DataTime;
-      if (!timeMap.has(key)) timeMap.set(key, {});
-      timeMap.get(key).humidity = parseInt(t.ElementValue[0].RelativeHumidity);
-    }
-  }
-
-  // Comfort index
-  if (elements['舒適度指數']) {
-    for (const t of elements['舒適度指數']) {
-      const key = t.DataTime;
-      if (!timeMap.has(key)) timeMap.set(key, {});
-      timeMap.get(key).comfort_index = parseInt(t.ElementValue[0].ComfortIndex);
-      timeMap.get(key).comfort_desc = t.ElementValue[0].ComfortIndexDescription;
-    }
-  }
-
-  // Wind speed (m/s → km/h, 3-hourly)
+  // Multi-format ingestion
+  processElement('溫度', 'temp', 'Temperature');
+  processElement('體感溫度', 'feels_like', 'ApparentTemperature');
+  processElement('露點溫度', 'dew_point', 'DewPoint');
+  processElement('相對濕度', 'humidity', 'RelativeHumidity');
+  processElement('舒適度指數', 'comfort_index', 'ComfortIndex');
+  
+  // Wind speed (m/s → km/h)
   if (elements['風速']) {
     for (const t of elements['風速']) {
-      const key = t.DataTime;
+      const key = t.DataTime || t.StartTime;
       if (!timeMap.has(key)) timeMap.set(key, {});
-      const speedMs = parseFloat(t.ElementValue[0].WindSpeed);
-      timeMap.get(key).wind_speed_ms = speedMs;
-      timeMap.get(key).wind_speed = Math.round(speedMs * 3.6 * 10) / 10;
+      const speedMs = parseFloat(t.ElementValue[0].WindSpeed || t.ElementValue[0].value);
+      if (!isNaN(speedMs)) {
+        timeMap.get(key).wind_speed_ms = speedMs;
+        timeMap.get(key).wind_speed = Math.round(speedMs * 3.6 * 10) / 10;
+      }
     }
   }
 
-  // Wind direction (Chinese → degrees, 3-hourly)
+  // Wind direction
   if (elements['風向']) {
     for (const t of elements['風向']) {
-      const key = t.DataTime;
+      const key = t.DataTime || t.StartTime;
       if (!timeMap.has(key)) timeMap.set(key, {});
-      const dirText = t.ElementValue[0].WindDirection;
+      const dirText = t.ElementValue[0].WindDirection || t.ElementValue[0].value;
       timeMap.get(key).wind_direction = WIND_DIR_MAP[dirText] ?? 0;
       timeMap.get(key).wind_direction_text = dirText;
     }
   }
 
-  // PoP (3-hour blocks)
-  if (elements['3小時降雨機率']) {
-    for (const t of elements['3小時降雨機率']) {
-      const pop = parseInt(t.ElementValue[0].ProbabilityOfPrecipitation);
-      const startKey = t.StartTime;
-      if (!timeMap.has(startKey)) timeMap.set(startKey, {});
-      timeMap.get(startKey).pop = pop;
-      timeMap.get(startKey)._popEndTime = t.EndTime;
+  // PoP (Exhaustive search for 3, 6, 12-hour blocks)
+  const popElements = ['3小時降雨機率', '6小時降雨機率', '12小時降雨機率', '降雨機率', '12小時降雨機率(百分比)'];
+  for (const name of popElements) {
+    if (elements[name]) {
+      for (const t of elements[name]) {
+        const key = t.DataTime || t.StartTime;
+        if (!key) continue;
+        const valObj = t.ElementValue[0];
+        const val = valObj.ProbabilityOfPrecipitation || valObj.value || valObj.ProbabilityOfPrecipitation6hr || valObj.ProbabilityOfPrecipitation12hr;
+        const pop = parseInt(val);
+        
+        if (!timeMap.has(key)) timeMap.set(key, {});
+        const currentPop = timeMap.get(key).pop || 0;
+        const newPop = isNaN(pop) ? 0 : pop;
+        timeMap.get(key).pop = Math.max(currentPop, newPop);
+      }
     }
   }
 
-  // Weather phenomenon (for cloud/rain/thunder)
+  // Weather phenomenon
   if (elements['天氣現象']) {
     for (const t of elements['天氣現象']) {
-      const startKey = t.StartTime;
-      if (!timeMap.has(startKey)) timeMap.set(startKey, {});
-      const code = t.ElementValue[0].WeatherCode;
+      const key = t.DataTime || t.StartTime;
+      if (!key) continue;
+      if (!timeMap.has(key)) timeMap.set(key, {});
+      const code = t.ElementValue[0].WeatherCode || t.ElementValue[0].value;
       const info = getWeatherCodeInfo(code);
-      timeMap.get(startKey).weather_code = parseInt(code);
-      timeMap.get(startKey).weather_text = t.ElementValue[0].Weather;
-      timeMap.get(startKey).cloud_coverage = info.cloud;
-      timeMap.get(startKey).is_thunder = info.isThunder;
-      timeMap.get(startKey).rain_intensity = info.rainIntensity;
+      timeMap.get(key).weather_code = parseInt(code);
+      timeMap.get(key).weather_text = t.ElementValue[0].Weather || t.ElementValue[0].value;
+      timeMap.get(key).cloud_coverage = info.cloud;
+      timeMap.get(key).is_thunder = info.isThunder;
+      timeMap.get(key).rain_intensity = info.rainIntensity;
     }
   }
 
@@ -307,16 +324,24 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
     windDir = interpField('wind_direction') || 0;
   }
 
-  // Nearest non-numeric fields
-  function nearestField(field) {
-    let closest = null, closestDist = Infinity;
+  // Non-numeric fields that apply as a step/block (e.g. PoP, WeatherCode)
+  // We should find the most recent entry <= targetMs, or the very first entry if targetMs is early
+  function findBlockField(field) {
+    let best = undefined;
+    let maxTime = -Infinity;
+    const MAX_LOOKBACK_MS = 12 * 60 * 60 * 1000; // 12 hours
+
     for (const e of entries) {
-      if (e.data[field] !== undefined) {
-        const dist = Math.abs(e.time - targetMs);
-        if (dist < closestDist) { closestDist = dist; closest = e.data[field]; }
+      if (e.data[field] !== undefined && e.time <= targetMs) {
+        if (e.time > maxTime) {
+          maxTime = e.time;
+          if (targetMs - e.time <= MAX_LOOKBACK_MS) {
+            best = e.data[field];
+          }
+        }
       }
     }
-    return closest;
+    return best;
   }
 
   const temp = interpField('temp') ?? 25;
@@ -324,18 +349,18 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
   const dewPoint = interpField('dew_point') ?? temp - 5;
   const humidity = interpField('humidity') ?? 70;
   const comfortIndex = interpField('comfort_index');
-  const comfortDesc = nearestField('comfort_desc') || '';
+  const comfortDesc = findBlockField('comfort_desc') || '';
   const rawWindSpeed = interpField('wind_speed') ?? 0;
   // C8: Diurnal wind correction — early morning calm, afternoon thermal convection
   const diurnalFactor = getDiurnalFactor(targetHour);
 
   const windSpeed = Math.round(rawWindSpeed * windFactor * diurnalFactor * 10) / 10;
   const cloudCov = interpField('cloud_coverage') ?? 50;
-  const pop = interpField('pop') ?? 0;
-  const weatherCode = nearestField('weather_code') ?? 1;
-  const weatherText = nearestField('weather_text') || '';
-  const windDirText = nearestField('wind_direction_text') || '';
-  const isThunder = nearestField('is_thunder') || false;
+  const pop = findBlockField('pop') ?? 0;
+  const weatherCode = findBlockField('weather_code') ?? 1;
+  const weatherText = findBlockField('weather_text') || '';
+  const windDirText = findBlockField('wind_direction_text') || '';
+  const isThunder = findBlockField('is_thunder') || false;
 
   // Improved gust estimation
   const windGust = estimateGust(windSpeed, windFactor, targetHour);
@@ -345,8 +370,8 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
   const rainMm = estimateRainMm(weatherInfo, pop);
 
   // Ground wetness factor (dewpoint proximity to temp)
-  const dewPointGap = temp - dewPoint;
-  const isGroundWet = dewPointGap < 2 && humidity > 90;
+  const dewPointGap = (temp !== undefined && dewPoint !== undefined) ? (temp - dewPoint) : 10;
+  const isGroundWet = (temp !== undefined && dewPoint !== undefined) ? (dewPointGap < 2 && humidity > 90) : false;
 
   return {
     temp: Math.round(temp * 10) / 10,

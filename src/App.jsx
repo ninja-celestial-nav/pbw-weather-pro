@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { RefreshCw, Radio, TrendingUp, Gauge, Compass, Activity, Sun, Moon, Video } from 'lucide-react';
+import { RefreshCw, Radio, TrendingUp, Gauge, Compass, Activity, Sun, Moon, Video, Trash2 } from 'lucide-react';
 import { useWeatherData } from './hooks/useWeatherData';
+import { toTaipeiDate } from './api/cwaApi';
 import LocationToggle from './components/LocationToggle';
 import TimePicker from './components/TimePicker';
 import PlayabilityGauge from './components/PlayabilityGauge';
@@ -95,10 +96,7 @@ export default function App() {
   const [locationId, setLocationId] = useState(urlParams.loc || 'youth_park');
   const [targetTime, setTargetTime] = useState(() => {
     if (urlParams.day !== null && urlParams.hour !== null) {
-      const d = new Date();
-      d.setDate(d.getDate() + (urlParams.day || 0));
-      d.setHours(urlParams.hour, 0, 0, 0);
-      return d;
+      return toTaipeiDate(urlParams.day, urlParams.hour);
     }
     return null;
   });
@@ -134,6 +132,12 @@ export default function App() {
     await refresh();
     showToast('資料已更新', 'success');
   }, [refresh, showToast]);
+
+  const handleClearCache = useCallback(() => {
+    localStorage.clear();
+    showToast('快取已清除，正在重新載入...', 'info');
+    setTimeout(() => window.location.reload(), 1000);
+  }, [showToast]);
 
   // C1: Handle best time click
   const handleBestTimeSelect = useCallback((time) => {
@@ -181,7 +185,15 @@ export default function App() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleClearCache}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${isLight ? 'bg-white border-slate-200 text-slate-500 hover:bg-orange-50 hover:text-orange-500 hover:border-orange-200 shadow-sm' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-orange-500/20 hover:border-orange-500/30'}`}
+              title="清除所有快取與設定"
+            >
+              <Trash2 size={16} />
+            </button>
+
             <button
               onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
               className={`p-2 rounded-xl border transition-all cursor-pointer ${isLight ? 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'}`}
@@ -190,15 +202,19 @@ export default function App() {
               {isLight ? <Moon size={14} /> : <Sun size={14} />}
             </button>
 
-            <div className={`flex items-center gap-2 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
-              {/* C11: Live clock */}
+            <div className={`hidden sm:flex items-center gap-2 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               <span className="font-mono">{formattedTime}</span>
               <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : dataSource === 'CWA' ? 'bg-emerald-400' : 'bg-red-400'}`} />
-              {loading ? '更新中...' : relativeTime(lastUpdate)}
-              {dataSource === 'CWA' && !loading && (
+              <div className="flex items-center">
+              {dataSource === 'CWA' && !loading && !targetTime && (
                 <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[9px] font-medium border border-emerald-500/20">CWA LIVE</span>
               )}
+              {targetTime && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[9px] font-medium border border-amber-500/20">預測模式 FORECAST</span>
+              )}
+              </div>
             </div>
+
             <button
               onClick={() => setIsCameraOpen(true)}
               className={`p-2 rounded-xl border transition-all cursor-pointer ${isLight ? 'bg-white border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-500 hover:border-red-200 shadow-sm' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-red-500/20 hover:border-red-500/30'}`}
@@ -206,6 +222,7 @@ export default function App() {
             >
               <Video size={14} className={!targetTime && dataSource === 'CWA' ? 'text-red-400 animate-pulse' : ''} />
             </button>
+
             <button
               onClick={handleRefresh}
               disabled={loading}
@@ -288,7 +305,7 @@ export default function App() {
             <span>·</span>
             <span>{location?.lat.toFixed(4)}°N, {location?.lng.toFixed(4)}°E</span>
             <span>·</span>
-            <span>{dataSource === 'CWA' ? '🟢 CWA 即時資料' : targetTime ? '預測模式' : '每60秒自動更新'}</span>
+            <span>{targetTime ? '🕒 預測模式 (Forecast)' : dataSource === 'CWA' ? '🟢 CWA 即時資料' : '每60秒自動更新'}</span>
           </div>
           <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
             PPI v2 · 風力55% + 降雨25% + 雲量8% + 體感7% + 地面5% · 日變風修正

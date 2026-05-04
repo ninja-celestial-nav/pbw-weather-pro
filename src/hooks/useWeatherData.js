@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { calculatePPI } from '../utils/ppiCalculator';
-import { fetchCWAWeather, getWeatherAtTime, estimateGust, getDiurnalFactor } from '../api/cwaApi';
+import { fetchCWAWeather, getWeatherAtTime, estimateGust, getDiurnalFactor, getTaipeiNow, getTaipeiHour, toTaipeiDate } from '../api/cwaApi';
 import { fetchOpenMeteo, getOpenMeteoAtTime, compareDataSources } from '../api/openMeteoApi';
 import { fetchObservation } from '../api/cwaObservation';
 
@@ -101,22 +101,31 @@ function calculateRadarAnalysis(weather) {
 
 function findBestPlayTimes(timeMap, windFactor, baseDate) {
   const results = [];
-  const now = new Date();
-  const isToday = baseDate.getDate() === now.getDate();
-  const nowHour = now.getHours();
+  const now = getTaipeiNow();
+  const currentTaipeiHour = getTaipeiHour(now);
+  
+  // Use a string comparison for date equality to avoid timezone mismatches
+  const isToday = baseDate.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) === 
+                  now.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
 
   for (let h = 6; h <= 21; h++) {
-    if (isToday && h < nowHour) continue; // Skip past hours today
+    if (isToday && h < currentTaipeiHour) continue; // Skip past hours today
     
-    const checkTime = new Date(baseDate);
-    checkTime.setHours(h, 0, 0, 0);
-    const w = getWeatherAtTime(timeMap, checkTime, windFactor);
+    // Offset checkTime to the target date's day
+    const nowClone = getTaipeiNow();
+    const baseClone = new Date(baseDate);
+    const dayDiff = Math.round((baseClone.setHours(0,0,0,0) - nowClone.setHours(0,0,0,0)) / (1000*60*60*24));
+    const targetTime = toTaipeiDate(dayDiff, h);
+    const w = getWeatherAtTime(timeMap, targetTime, windFactor);
     if (w) {
       const p = calculatePPI(w);
-      results.push({ hour: h, targetTime: checkTime, ppi: p.score, category: p.category, color: p.color, weather: w });
+      results.push({ hour: h, targetTime: targetTime, ppi: p.score, category: p.category, color: p.color, weather: w });
     }
   }
-  results.sort((a, b) => b.ppi - a.ppi);
+  results.sort((a, b) => {
+    if (b.ppi !== a.ppi) return b.ppi - a.ppi;
+    return a.targetTime.getTime() - b.targetTime.getTime();
+  });
   const best = results[0] || null;
   const topHours = results.filter(r => r.ppi >= 60).sort((a, b) => a.hour - b.hour);
   return { best, topHours, allHours: results.sort((a, b) => a.hour - b.hour) };
@@ -145,7 +154,7 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
     setLoading(true);
     setError(null);
 
-    const now = new Date();
+    const now = getTaipeiNow();
     const analyzeTime = targetTime || now;
 
     try {
@@ -195,9 +204,18 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
 
       // Build 6-hour trend
       const trendData = [];
+      const baseHour = getTaipeiHour(analyzeTime);
       for (let i = 0; i < 6; i++) {
-        const trendTime = new Date(analyzeTime);
-        trendTime.setHours(analyzeTime.getHours() + i, 0, 0, 0);
+        const targetH = baseHour + i;
+        const dayOffset = Math.floor(targetH / 24);
+        const finalH = targetH % 24;
+        
+        // Calculate day offset relative to NOW to use toTaipeiDate correctly
+        const nowClone = getTaipeiNow();
+        const analyzeClone = new Date(analyzeTime);
+        const baseDayDiff = Math.round((analyzeClone.setHours(0,0,0,0) - nowClone.setHours(0,0,0,0)) / (1000*60*60*24));
+        
+        const trendTime = toTaipeiDate(baseDayDiff + dayOffset, finalH);
         const tW = getWeatherAtTime(timeMap, trendTime, location.windFactor);
         if (tW) {
           const tP = calculatePPI(tW);

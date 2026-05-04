@@ -16,18 +16,18 @@ const STATION_MAP = {
 
 export async function fetchObservation(locationId) {
   try {
+    const CWA_API_KEY = 'CWA-39834882-92D7-421E-A5B6-EE3BBF5F5E51';
     const stationName = STATION_MAP[locationId] || '臺北';
     const baseUrl = IS_DEV ? CWA_BASE_DEV : CWA_BASE_PROD;
     
     // O-A0001-001: 自動氣象站-氣象觀測資料
-    // Alternatively: O-A0003-001 (局屬氣象站)
-    const url = `${baseUrl}?apiCode=O-A0001-001&locationName=${encodeURIComponent(stationName)}`;
+    const url = `${baseUrl}?apiCode=O-A0001-001&locationName=${encodeURIComponent(stationName)}&Authorization=${CWA_API_KEY}`;
     
     const response = await fetch(url);
     if (!response.ok) {
       // Fallback to O-A0003-001 if station not found in A0001
       if (stationName === '臺北') {
-        const fbUrl = `${baseUrl}?apiCode=O-A0003-001&locationName=臺北`;
+        const fbUrl = `${baseUrl}?apiCode=O-A0003-001&locationName=臺北&Authorization=${CWA_API_KEY}`;
         const fbRes = await fetch(fbUrl);
         if (fbRes.ok) return parseObservation(await fbRes.json());
       }

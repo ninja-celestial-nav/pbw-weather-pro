@@ -15,7 +15,7 @@ export async function fetchOpenMeteo(lat, lng) {
     longitude: lng.toString(),
     hourly: 'temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability,precipitation,cloud_cover,weather_code',
     timezone: 'Asia/Taipei',
-    forecast_days: '3',
+    forecast_days: '7',
   });
 
   const response = await fetch(`${OPEN_METEO_BASE}?${params}`);
@@ -28,7 +28,8 @@ export async function fetchOpenMeteo(lat, lng) {
   const { time, temperature_2m, relative_humidity_2m, wind_speed_10m, wind_direction_10m, wind_gusts_10m, precipitation_probability, precipitation, cloud_cover, weather_code } = data.hourly;
 
   for (let i = 0; i < time.length; i++) {
-    const ts = new Date(time[i] + '+08:00').getTime();
+    const timeStr = time[i];
+    const ts = new Date(timeStr.includes('Z') || timeStr.includes('+') ? timeStr : timeStr + '+08:00').getTime();
     hourlyMap.set(ts, {
       temp: temperature_2m[i],
       humidity: relative_humidity_2m[i],

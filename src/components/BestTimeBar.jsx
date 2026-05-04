@@ -3,6 +3,7 @@
  * B10: Rain countdown timer
  */
 import { MiniWeatherIcon } from './WeatherSummary';
+import { getTaipeiNow } from '../api/cwaApi';
 
 export default function BestTimeBar({ bestTimes, trend, onSelectTime }) {
   if (!bestTimes || !bestTimes.allHours?.length) return null;
@@ -18,11 +19,19 @@ export default function BestTimeBar({ bestTimes, trend, onSelectTime }) {
     }
   }
 
+    const firstTime = allHours[0]?.targetTime;
+    const now = getTaipeiNow();
+    const isToday = firstTime?.toDateString() === now.toDateString();
+    const isTomorrow = firstTime?.toDateString() === new Date(now.setDate(now.getDate() + 1)).toDateString();
+    
+    const labelPrefix = isToday ? '今日' : isTomorrow ? '明日' : 
+                        `${firstTime?.getMonth() + 1}/${firstTime?.getDate()}`;
+
   return (
     <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-400 tracking-wide uppercase">⭐ 今日最佳時段</span>
+          <span className="text-xs font-semibold text-slate-400 tracking-wide uppercase">⭐ {labelPrefix}最佳時段</span>
           <span className="text-[8px] text-slate-600">點擊可查看</span>
         </div>
         {best && (

@@ -23,11 +23,12 @@ function calcWindScore(windSpeed, windGust) {
 }
 
 function calcRainScore(rainMm, pop) {
-  if (rainMm > 0.5 || pop > 40) return 0;
+  // Only zero out if actual rain is significant or PoP is extremely high (85%+)
+  if (rainMm > 0.8 || pop >= 85) return 0;
 
   let score = 100;
   if (rainMm > 0) score -= (rainMm / 0.5) * 40;
-  if (pop > 20) score -= ((pop - 20) / 20) * 30;
+  if (pop > 20) score -= ((pop - 20) / 40) * 80;
   return Math.max(0, Math.min(100, score));
 }
 
@@ -54,7 +55,7 @@ function calcHeatScore(feelsLike) {
 /** A6: Ground condition score — wetness from humidity + dew point */
 function calcGroundScore(humidity, dewPoint, temp, rainMm) {
   let score = 100;
-  const dewGap = temp - (dewPoint ?? temp - 5);
+  const dewGap = (temp !== undefined && dewPoint !== undefined) ? (temp - dewPoint) : 5;
 
   // Ground is likely wet if dewpoint is very close to temp
   if (dewGap < 1) score -= 40;        // Fog/dew forming
@@ -87,8 +88,13 @@ export function calculatePPI(weather) {
   const windScore = calcWindScore(wind_speed, wind_gust);
   const rainScore = calcRainScore(rain_mm, pop);
   const cloudScore = calcCloudScore(cloud_coverage);
-  const heatScore = calcHeatScore(feels_like);
-  const groundScore = calcGroundScore(humidity, dew_point, temp, rain_mm);
+  
+  // Guard against missing values
+  const safeFeelsLike = (feels_like !== undefined && !isNaN(feels_like)) ? feels_like : temp;
+  const safeDewPoint = (dew_point !== undefined && !isNaN(dew_point)) ? dew_point : (temp - 5);
+  
+  const heatScore = calcHeatScore(safeFeelsLike);
+  const groundScore = calcGroundScore(humidity, safeDewPoint, temp, rain_mm);
 
   // A7: Thunderstorm handling — 3-tier system
   // Taiwan summer CWA常報「短暫陣雨或雷雨」，PoP 30-40% 很常見，不能直接歸零
@@ -112,12 +118,7 @@ export function calculatePPI(weather) {
   }
 
   // Calculate weighted score
-  let score;
-  if (rainScore === 0) {
-    score = Math.min(15, windScore * 0.15);
-  } else {
-    score = windScore * 0.55 + rainScore * 0.25 + cloudScore * 0.08 + heatScore * 0.07 + groundScore * 0.05;
-  }
+  let score = windScore * 0.55 + rainScore * 0.25 + cloudScore * 0.08 + heatScore * 0.07 + groundScore * 0.05;
 
   // Ground wetness modifier
   if (is_ground_wet) score = Math.min(score, 30);

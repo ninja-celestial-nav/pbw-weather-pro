@@ -7,18 +7,29 @@ export default function RadarSimulation({ radar, weather }) {
 
   // Generate cloud cells
   useEffect(() => {
-    if (!weather) return;
-    const windRad = (weather.wind_direction + 180) * Math.PI / 180; // upwind dir
+    if (!weather || weather.radar_echo <= 5) {
+      setClouds([]);
+      return;
+    }
+    
+    // Meteorological Wind Direction (0=N, 90=E) to SVG Angle (radians)
+    // Upwind direction is the direction the wind is blowing FROM.
+    // SVG 0rad = 3 o'clock (East), -Math.PI/2 = 12 o'clock (North)
+    const windDir = weather?.wind_direction ?? 0;
+    const upwindRad = (windDir - 90) * (Math.PI / 180);
+    
     const newClouds = [];
-    const count = weather.radar_echo > 20 ? 5 : weather.radar_echo > 10 ? 3 : 1;
+    const count = weather.radar_echo > 30 ? 6 : weather.radar_echo > 15 ? 4 : 2;
+    
     for (let i = 0; i < count; i++) {
-      const dist = 40 + Math.random() * 50;
-      const spread = (Math.random() - 0.5) * 0.8;
+      // Position clouds on the outer ring in the upwind direction
+      const dist = 70 + Math.random() * 30;
+      const spread = (Math.random() - 0.5) * 1.0; // wider spread
       newClouds.push({
-        x: 120 + dist * Math.cos(windRad + spread),
-        y: 120 + dist * Math.sin(windRad + spread),
-        r: 8 + Math.random() * 15,
-        intensity: 0.1 + (weather.radar_echo / 65) * 0.5,
+        x: 120 + dist * Math.cos(upwindRad + spread),
+        y: 120 + dist * Math.sin(upwindRad + spread),
+        r: 10 + Math.random() * 15,
+        intensity: 0.15 + (weather.radar_echo / 70) * 0.5,
         id: i,
       });
     }
