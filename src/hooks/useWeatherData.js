@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { calculatePPI } from '../utils/ppiCalculator';
 import { fetchCWAWeather, getWeatherAtTime } from '../api/cwaApi';
+import { fetchOpenMeteo, getOpenMeteoAtTime, compareDataSources } from '../api/openMeteoApi';
+import { fetchObservation } from '../api/cwaObservation';
 
 const LOCATIONS = {
   youth_park: {
@@ -47,21 +49,47 @@ const LOCATIONS = {
   },
 };
 
+// C5: History management
+const HISTORY_KEY = 'pbw_ppi_history';
+const MAX_HISTORY = 168; // 7 days × 24 hours
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveHistory(locationId, ppiScore) {
+  try {
+    const history = loadHistory();
+    if (!history[locationId]) history[locationId] = [];
+    const now = Date.now();
+    history[locationId].push({ t: now, s: ppiScore });
+    // Keep only last 7 days
+    const cutoff = now - 7 * 24 * 60 * 60 * 1000;
+    history[locationId] = history[locationId].filter(h => h.t > cutoff).slice(-MAX_HISTORY);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch { /* localStorage full or unavailable */ }
+}
+
+function getHistory(locationId) {
+  const history = loadHistory();
+  return history[locationId] || [];
+}
+
 function calculateRadarAnalysis(weather) {
   const scanDistance = 20;
   const windSpeedKmh = weather.wind_speed;
-
   if (windSpeedKmh < 1) {
     return { arrivalTime: null, direction: weather.wind_direction, scanDistance, threat: 'none', message: '風速過低，無法計算' };
   }
-
   const arrivalMinutes = Math.round((scanDistance / windSpeedKmh) * 60);
   const upwindDirection = (weather.wind_direction + 180) % 360;
   let threat = 'none';
   if (weather.radar_echo > 35) threat = 'high';
   else if (weather.radar_echo > 20) threat = 'medium';
   else if (weather.radar_echo > 10) threat = 'low';
-
   return {
     arrivalTime: arrivalMinutes, upwindDirection, scanDistance, threat,
     radarEcho: weather.radar_echo,
@@ -71,9 +99,6 @@ function calculateRadarAnalysis(weather) {
   };
 }
 
-/**
- * B4: Scan all hours in a day to find the best play time
- */
 function findBestPlayTimes(timeMap, windFactor, baseDate) {
   const results = [];
   for (let h = 6; h <= 21; h++) {
@@ -85,17 +110,12 @@ function findBestPlayTimes(timeMap, windFactor, baseDate) {
       results.push({ hour: h, ppi: p.score, category: p.category, color: p.color, weather: w });
     }
   }
-  // Find best window (consecutive good hours)
   results.sort((a, b) => b.ppi - a.ppi);
   const best = results[0] || null;
   const topHours = results.filter(r => r.ppi >= 60).sort((a, b) => a.hour - b.hour);
-
   return { best, topHours, allHours: results.sort((a, b) => a.hour - b.hour) };
 }
 
-/**
- * Main hook
- */
 export function useWeatherData(locationId = 'youth_park', targetTime = null) {
   const [weather, setWeather] = useState(null);
   const [ppi, setPpi] = useState(null);
@@ -107,8 +127,11 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
   const [error, setError] = useState(null);
   const [bestTimes, setBestTimes] = useState(null);
   const [comparison, setComparison] = useState(null);
+  const [crossValidation, setCrossValidation] = useState(null);
+  const [ppiHistory, setPpiHistory] = useState([]);
 
   const cwaCache = useRef({});
+  const omCache = useRef({});
   const location = LOCATIONS[locationId];
 
   const fetchData = useCallback(async () => {
@@ -119,7 +142,6 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
     const analyzeTime = targetTime || now;
 
     try {
-      // Fetch data for current location
       const cacheKey = locationId;
       const cached = cwaCache.current[cacheKey];
       const cacheAge = cached ? (now - cached.fetchedAt) : Infinity;
@@ -134,11 +156,24 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
         cwaCache.current[cacheKey] = { timeMap, fetchedAt: now };
       }
 
-      // Get current weather
-      const weatherData = getWeatherAtTime(timeMap, analyzeTime, location.windFactor);
+      let weatherData = getWeatherAtTime(timeMap, analyzeTime, location.windFactor);
       if (!weatherData) throw new Error('No data for target time');
 
+      // C7: Merge real-time observation if looking at "now"
+      if (!targetTime) {
+        const obs = await fetchObservation(locationId);
+        if (obs) {
+          weatherData = { ...weatherData, ...obs, isRealtimeObserved: true };
+        }
+      }
+
       const ppiData = calculatePPI(weatherData);
+
+      // C5: Save to history (only for real-time, not forecast)
+      if (!targetTime) {
+        saveHistory(locationId, ppiData.score);
+      }
+      setPpiHistory(getHistory(locationId));
 
       // Build 6-hour trend
       const trendData = [];
@@ -163,9 +198,7 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
         }
       }
 
-      // B4: Best play times for today
       const bestTimesData = findBestPlayTimes(timeMap, location.windFactor, analyzeTime);
-
       const radarData = calculateRadarAnalysis(weatherData);
 
       setWeather(weatherData);
@@ -177,25 +210,26 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
       setDataSource('CWA');
       setLoading(false);
 
-      // Load comparison in background (non-blocking)
+      // Background: comparison
       const comparisonData = {};
       for (const [locId, loc] of Object.entries(LOCATIONS)) {
         try {
-          const locCacheKey = locId;
-          const locCached = cwaCache.current[locCacheKey];
-          const locCacheAge = locCached ? (now - locCached.fetchedAt) : Infinity;
+          const locCached = cwaCache.current[locId];
+          const locAge = locCached ? (now - locCached.fetchedAt) : Infinity;
           let locTimeMap;
-          if (locCached && locCacheAge < CACHE_TTL) {
+          if (locCached && locAge < CACHE_TTL) {
             locTimeMap = locCached.timeMap;
           } else {
             const locResult = await fetchCWAWeather(locId);
             locTimeMap = locResult.timeMap;
-            cwaCache.current[locCacheKey] = { timeMap: locTimeMap, fetchedAt: now };
+            cwaCache.current[locId] = { timeMap: locTimeMap, fetchedAt: now };
           }
           const locWeather = getWeatherAtTime(locTimeMap, analyzeTime, loc.windFactor);
           if (locWeather) {
             const locPpi = calculatePPI(locWeather);
-            comparisonData[locId] = { location: loc, weather: locWeather, ppi: locPpi };
+            // C9: Get 24hr history for sparkline
+            const locHistory = getHistory(locId);
+            comparisonData[locId] = { location: loc, weather: locWeather, ppi: locPpi, history: locHistory };
           }
         } catch (e) {
           console.warn(`Comparison fetch failed for ${locId}:`, e.message);
@@ -204,6 +238,27 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
       if (Object.keys(comparisonData).length >= 2) {
         setComparison(comparisonData);
       }
+
+      // C6: Background Open-Meteo cross-validation
+      try {
+        const omCached = omCache.current[locationId];
+        const omAge = omCached ? (now - omCached.fetchedAt) : Infinity;
+        let omHourlyMap;
+        if (omCached && omAge < CACHE_TTL) {
+          omHourlyMap = omCached.hourlyMap;
+        } else {
+          const omResult = await fetchOpenMeteo(location.lat, location.lng);
+          omHourlyMap = omResult.hourlyMap;
+          omCache.current[locationId] = { hourlyMap: omHourlyMap, fetchedAt: now };
+        }
+        const omData = getOpenMeteoAtTime(omHourlyMap, analyzeTime);
+        const cv = compareDataSources(weatherData, omData);
+        setCrossValidation(cv);
+      } catch (e) {
+        console.warn('Open-Meteo failed:', e.message);
+        setCrossValidation(null);
+      }
+
     } catch (err) {
       console.warn('CWA API failed:', err.message);
       setError(err.message);
@@ -222,7 +277,7 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
 
   return {
     weather, ppi, trend, radar, location, loading, lastUpdate,
-    dataSource, error, bestTimes, comparison,
+    dataSource, error, bestTimes, comparison, crossValidation, ppiHistory,
     refresh: fetchData, locations: LOCATIONS,
   };
 }

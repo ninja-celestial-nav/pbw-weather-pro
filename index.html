@@ -2,9 +2,21 @@
 <html lang="zh-TW">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Pickleball Weather Pro-Predictor — 匹克球天氣預測系統，台北青年公園與二重疏洪道即時適打指數分析。" />
     <meta name="theme-color" content="#0a0e1a" />
+    
+    <!-- C3: PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    
+    <!-- C14: Open Graph Meta Tags -->
+    <meta property="og:title" content="Pickleball Weather Pro | 匹克球天氣預測" />
+    <meta property="og:description" content="即時 PPI 適打指數分析、最佳打球時段推薦，專為匹克球愛好者設計的天氣預測系統。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="og:url" content="https://pbw-weather-pro.vercel.app/" />
+    
     <title>Pickleball Weather Pro | 匹克球天氣預測</title>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,5 +26,15 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // C3: Register Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

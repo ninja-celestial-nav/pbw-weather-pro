@@ -317,7 +317,15 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
   const comfortIndex = interpField('comfort_index');
   const comfortDesc = nearestField('comfort_desc') || '';
   const rawWindSpeed = interpField('wind_speed') ?? 0;
-  const windSpeed = Math.round(rawWindSpeed * windFactor * 10) / 10;
+  // C8: Diurnal wind correction — early morning calm, afternoon thermal convection
+  let diurnalFactor = 1.0;
+  if (targetHour >= 5 && targetHour <= 7) diurnalFactor = 0.7;       // dawn calm
+  else if (targetHour >= 8 && targetHour <= 10) diurnalFactor = 0.85; // morning building
+  else if (targetHour >= 11 && targetHour <= 13) diurnalFactor = 1.0; // midday
+  else if (targetHour >= 14 && targetHour <= 16) diurnalFactor = 1.25; // afternoon convection
+  else if (targetHour >= 17 && targetHour <= 18) diurnalFactor = 1.1;  // evening transition
+  else if (targetHour >= 19 || targetHour <= 4) diurnalFactor = 0.75;  // night calm
+  const windSpeed = Math.round(rawWindSpeed * windFactor * diurnalFactor * 10) / 10;
   const cloudCov = interpField('cloud_coverage') ?? 50;
   const pop = interpField('pop') ?? 0;
   const weatherCode = nearestField('weather_code') ?? 1;

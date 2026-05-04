@@ -1,5 +1,6 @@
 /**
  * B1: 3-location comparison view
+ * C9: 24hr PPI sparkline in each card
  */
 export default function ComparisonView({ comparison, activeLocation, onSelectLocation }) {
   if (!comparison || Object.keys(comparison).length < 2) return null;
@@ -17,7 +18,7 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
         {locations.map(([locId, data]) => {
           const isActive = locId === activeLocation;
           const isBest = locId === bestLocId;
-          const { ppi, weather, location } = data;
+          const { ppi, weather, location, history } = data;
 
           return (
             <button
@@ -31,14 +32,20 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
                   : 'border-white/[0.06] bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.05]'}
               `}
             >
-              {/* Best badge */}
-              {isBest && (
-                <div className="absolute top-1.5 right-1.5 px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[8px] font-bold border border-emerald-500/30">
-                  最佳 ⭐
-                </div>
-              )}
+              {/* C12: Venue photo background with gradient overlay */}
+              <div 
+                className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity bg-cover bg-center"
+                style={{ backgroundImage: `url(/images/${locId}.png)` }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+              
+              <div className="relative z-10">
+                {isBest && (
+                  <div className="absolute top-0 right-0 px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[8px] font-bold border border-emerald-500/30">
+                    最佳 ⭐
+                  </div>
+                )}
 
-              {/* PPI Ring */}
               <div className="flex items-center gap-2.5 mb-2">
                 <div className="relative w-11 h-11 flex-shrink-0">
                   <svg viewBox="0 0 44 44" className="w-full h-full -rotate-90">
@@ -62,7 +69,6 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
                 </div>
               </div>
 
-              {/* Key metrics */}
               <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[9px]">
                 <div className="text-slate-500">風速</div>
                 <div className="text-right text-slate-300">{weather.wind_speed} km/h</div>
@@ -72,14 +78,52 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
                 <div className="text-right text-slate-300">{weather.temp}°C</div>
               </div>
 
-              {/* Status bar */}
-              <div className={`mt-2 text-center text-[9px] font-semibold py-0.5 rounded`} style={{ color: ppi.color, backgroundColor: `${ppi.color}15` }}>
+              {/* C9: Mini sparkline */}
+              {history && history.length > 3 && (
+                <div className="mt-2 pt-1.5 border-t border-white/[0.04]">
+                  <Sparkline data={history.slice(-24)} color={ppi.color} />
+                </div>
+              )}
+
+              <div className="mt-2 text-center text-[9px] font-semibold py-0.5 rounded" style={{ color: ppi.color, backgroundColor: `${ppi.color}15` }}>
                 {ppi.category}
+              </div>
               </div>
             </button>
           );
         })}
       </div>
     </div>
+  );
+}
+
+/** C9: Mini sparkline SVG */
+function Sparkline({ data, color, width = '100%', height = 20 }) {
+  if (!data || data.length < 2) return null;
+
+  const scores = data.map(d => d.s);
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const range = max - min || 1;
+
+  const w = 100;
+  const h = height;
+  const points = scores.map((s, i) => {
+    const x = (i / (scores.length - 1)) * w;
+    const y = h - ((s - min) / range) * (h - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg width={width} height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="opacity-60">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }

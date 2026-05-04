@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { RefreshCw, Radio, TrendingUp, Gauge, Compass, Activity, Sun, Moon } from 'lucide-react';
 import { useWeatherData } from './hooks/useWeatherData';
 import LocationToggle from './components/LocationToggle';
@@ -7,55 +7,138 @@ import PlayabilityGauge from './components/PlayabilityGauge';
 import WindCompass from './components/WindCompass';
 import RadarSimulation from './components/RadarSimulation';
 import WeatherCards from './components/WeatherCards';
-import TrendChart from './components/TrendChart';
 import PPIBreakdown from './components/PPIBreakdown';
 import ThunderstormBanner from './components/ThunderstormBanner';
 import ComparisonView from './components/ComparisonView';
 import WeatherSummary from './components/WeatherSummary';
 import BestTimeBar from './components/BestTimeBar';
 import SkeletonLoader from './components/SkeletonLoader';
+import CrossValidationBadge from './components/CrossValidationBadge';
+import ToastContainer, { useToast } from './components/Toast';
 
-function SectionHeader({ icon: Icon, title, subtitle }) {
+// C13: Lazy load the heavy chart component
+const TrendChart = lazy(() => import('./components/TrendChart'));
+
+// C4: URL state helpers
+function getUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    loc: params.get('loc') || null,
+    day: parseInt(params.get('day')) || null,
+    hour: parseInt(params.get('hour')) || null,
+  };
+}
+
+function setUrlParams(loc, targetTime) {
+  const params = new URLSearchParams();
+  if (loc) params.set('loc', loc);
+  if (targetTime) {
+    const now = new Date();
+    const dayOffset = Math.round((targetTime.setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000*60*60*24));
+    if (dayOffset >= 0) params.set('day', dayOffset);
+    params.set('hour', targetTime.getHours());
+  }
+  const qs = params.toString();
+  const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+  window.history.replaceState(null, '', url);
+}
+
+// C11: Live clock hook
+function useLiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
+function relativeTime(date) {
+  if (!date) return '';
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 10) return '剛剛';
+  if (diff < 60) return `${diff}秒前`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}分鐘前`;
+  return `${Math.floor(diff / 3600)}小時前`;
+}
+
+function SectionHeader({ icon: Icon, title, subtitle, isLight }) {
   return (
     <div className="flex items-center gap-2.5 mb-4">
-      <div className="p-1.5 rounded-lg bg-white/5 dark:bg-white/5 light-mode-header-icon">
+      <div className={`p-1.5 rounded-lg ${isLight ? 'bg-indigo-100' : 'bg-white/5'}`}>
         <Icon size={14} className="text-indigo-400" />
       </div>
       <div>
-        <h2 className="text-sm font-semibold text-white leading-tight">{title}</h2>
-        {subtitle && <p className="text-[10px] text-slate-500">{subtitle}</p>}
+        <h2 className={`text-sm font-semibold leading-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>{title}</h2>
+        {subtitle && <p className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{subtitle}</p>}
       </div>
     </div>
   );
 }
 
-function GlassPanel({ children, className = '' }) {
+function GlassPanel({ children, className = '', isLight }) {
   return (
-    <div className={`bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 ${className}`}>
+    <div className={`backdrop-blur-xl rounded-2xl p-5 ${isLight ? 'bg-white/80 border border-slate-200/60 shadow-sm' : 'bg-white/[0.03] border border-white/[0.06]'} ${className}`}>
       {children}
     </div>
   );
 }
 
 export default function App() {
-  const [locationId, setLocationId] = useState('youth_park');
-  const [targetTime, setTargetTime] = useState(null);
-  const [theme, setTheme] = useState('dark'); // B7: theme toggle
+  // C4: Init from URL
+  const urlParams = getUrlParams();
+  const [locationId, setLocationId] = useState(urlParams.loc || 'youth_park');
+  const [targetTime, setTargetTime] = useState(() => {
+    if (urlParams.day !== null && urlParams.hour !== null) {
+      const d = new Date();
+      d.setDate(d.getDate() + (urlParams.day || 0));
+      d.setHours(urlParams.hour, 0, 0, 0);
+      return d;
+    }
+    return null;
+  });
+  const [theme, setTheme] = useState(() => localStorage.getItem('pbw_theme') || 'dark');
+
   const {
     weather, ppi, trend, radar, location, loading, lastUpdate,
-    dataSource, error, bestTimes, comparison,
+    dataSource, error, bestTimes, comparison, crossValidation, ppiHistory,
     refresh, locations,
   } = useWeatherData(locationId, targetTime);
 
-  const formattedTime = lastUpdate
-    ? lastUpdate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : '--:--:--';
-
+  const { toasts, show: showToast } = useToast();
+  const now = useLiveClock();
   const isLight = theme === 'light';
 
+  // C4: Update URL when state changes
+  useEffect(() => {
+    setUrlParams(locationId, targetTime);
+  }, [locationId, targetTime]);
+
+  // C7: Theme persistence
+  useEffect(() => {
+    localStorage.setItem('pbw_theme', theme);
+  }, [theme]);
+
+  // C2: Refresh with toast
+  const handleRefresh = useCallback(async () => {
+    await refresh();
+    showToast('資料已更新', 'success');
+  }, [refresh, showToast]);
+
+  // C1: Handle best time click
+  const handleBestTimeSelect = useCallback((time) => {
+    setTargetTime(time);
+    showToast(`切換到 ${String(time.getHours()).padStart(2, '0')}:00 預測模式`, 'info');
+  }, [showToast]);
+
+  const formattedTime = now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
   return (
-    <div className={`min-h-screen transition-colors duration-500 text-white selection:bg-indigo-500/30 ${isLight ? 'bg-[#f0f2f7]' : 'bg-[#0a0e1a]'}`}>
-      {/* Ambient background */}
+    <div className={`min-h-screen transition-colors duration-500 selection:bg-indigo-500/30 ${isLight ? 'bg-gradient-to-b from-slate-50 to-blue-50/30 text-slate-800' : 'bg-[#0a0e1a] text-white'}`}>
+      {/* C2: Toast container */}
+      <ToastContainer toasts={toasts} />
+
+      {/* Ambient background (dark only) */}
       {!isLight && (
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-indigo-600/[0.04] rounded-full blur-[120px]" />
@@ -83,115 +166,85 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* B7: Theme toggle */}
             <button
               onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${isLight ? 'bg-slate-200 border-slate-300 text-slate-600 hover:bg-slate-300' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'}`}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${isLight ? 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'}`}
               title="切換主題"
             >
               {isLight ? <Moon size={14} /> : <Sun size={14} />}
             </button>
 
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+            <div className={`flex items-center gap-2 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
+              {/* C11: Live clock */}
+              <span className="font-mono">{formattedTime}</span>
               <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : dataSource === 'CWA' ? 'bg-emerald-400' : 'bg-red-400'}`} />
-              {loading ? '更新中...' : `最後更新 ${formattedTime}`}
+              {loading ? '更新中...' : relativeTime(lastUpdate)}
               {dataSource === 'CWA' && !loading && (
                 <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[9px] font-medium border border-emerald-500/20">CWA LIVE</span>
               )}
-              {dataSource === 'error' && (
-                <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[9px] font-medium border border-red-500/20">API ERROR</span>
-              )}
             </div>
             <button
-              onClick={refresh}
+              onClick={handleRefresh}
               disabled={loading}
-              className={`p-2 rounded-xl border transition-all disabled:opacity-30 cursor-pointer ${isLight ? 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'}`}
+              className={`p-2 rounded-xl border transition-all disabled:opacity-30 cursor-pointer ${isLight ? 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'}`}
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
         </header>
 
-        {/* Location Toggle */}
         <div className="flex justify-center mb-5">
-          <LocationToggle
-            activeLocation={locationId}
-            onToggle={setLocationId}
-            locations={locations}
-          />
+          <LocationToggle activeLocation={locationId} onToggle={setLocationId} locations={locations} />
         </div>
 
-        {/* Time Picker */}
         <div className="mb-5">
           <TimePicker targetTime={targetTime} onTimeChange={setTargetTime} />
         </div>
 
-        {/* Content: skeleton vs loaded */}
         {loading && !weather ? (
           <SkeletonLoader />
         ) : (
           <>
-            {/* A7: Thunderstorm Banner */}
             <ThunderstormBanner ppi={ppi} weather={weather} />
-
-            {/* B2+B3: Weather Summary with animated icon */}
             <WeatherSummary weather={weather} ppi={ppi} />
+            <ComparisonView comparison={comparison} activeLocation={locationId} onSelectLocation={setLocationId} />
+            <BestTimeBar bestTimes={bestTimes} trend={trend} onSelectTime={handleBestTimeSelect} />
+            <CrossValidationBadge crossValidation={crossValidation} />
 
-            {/* B1: Location Comparison */}
-            <ComparisonView
-              comparison={comparison}
-              activeLocation={locationId}
-              onSelectLocation={setLocationId}
-            />
-
-            {/* B4+B10: Best Time + Rain Countdown */}
-            <BestTimeBar bestTimes={bestTimes} trend={trend} />
-
-            {/* Main Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
-              <GlassPanel>
-                <SectionHeader icon={Gauge} title="Playability Index" subtitle="適打指數 PPI" />
-                <PlayabilityGauge
-                  score={ppi?.score || 0}
-                  category={ppi?.category || ''}
-                  color={ppi?.color || '#666'}
-                />
+              <GlassPanel isLight={isLight}>
+                <SectionHeader icon={Gauge} title="Playability Index" subtitle="適打指數 PPI" isLight={isLight} />
+                <PlayabilityGauge score={ppi?.score || 0} category={ppi?.category || ''} color={ppi?.color || '#666'} />
                 <div className="mt-4">
                   <PPIBreakdown ppi={ppi} />
                 </div>
               </GlassPanel>
 
-              <GlassPanel>
-                <SectionHeader icon={Compass} title="Wind Analysis" subtitle="風向分析 · 球場方位" />
-                <WindCompass
-                  windDirection={weather?.wind_direction || 0}
-                  windSpeed={weather?.wind_speed || 0}
-                  windGust={weather?.wind_gust || 0}
-                  courtOrientation={location?.courtOrientation || 0}
-                />
+              <GlassPanel isLight={isLight}>
+                <SectionHeader icon={Compass} title="Wind Analysis" subtitle="風向分析 · 球場方位" isLight={isLight} />
+                <WindCompass windDirection={weather?.wind_direction || 0} windSpeed={weather?.wind_speed || 0} windGust={weather?.wind_gust || 0} courtOrientation={location?.courtOrientation || 0} />
               </GlassPanel>
 
-              <GlassPanel>
-                <SectionHeader icon={Radio} title="Radar Scan" subtitle="上風處雲系掃描 · 20km" />
+              <GlassPanel isLight={isLight}>
+                <SectionHeader icon={Radio} title="Radar Scan" subtitle="上風處雲系掃描 · 20km" isLight={isLight} />
                 <RadarSimulation radar={radar} weather={weather} />
               </GlassPanel>
             </div>
 
-            {/* B6: Enhanced Weather Cards (5 cards) */}
             <div className="mb-5">
               <WeatherCards weather={weather} />
             </div>
 
-            {/* Trend Chart */}
-            <GlassPanel>
-              <SectionHeader icon={TrendingUp} title="5-Hour Forecast" subtitle="未來五小時趨勢預測" />
+            {/* C13: Lazy loaded trend chart */}
+            <GlassPanel isLight={isLight}>
+              <SectionHeader icon={TrendingUp} title="6-Hour Forecast" subtitle="未來六小時趨勢預測" isLight={isLight} />
               <div className="flex items-center gap-6 mb-3 text-[10px]">
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-0.5 bg-indigo-400 rounded-full" />
                   <span className="text-slate-400">PPI 指數</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-0.5 bg-cyan-400 rounded-full" style={{borderTop:'1px dashed #22d3ee'}} />
+                  <span className="w-3 h-0.5 bg-cyan-400 rounded-full" />
                   <span className="text-slate-400">風速 (km/h)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -199,23 +252,23 @@ export default function App() {
                   <span className="text-slate-400">降雨機率 (%)</span>
                 </div>
               </div>
-              <TrendChart data={trend} />
+              <Suspense fallback={<div className="h-[280px] flex items-center justify-center text-slate-500 text-xs">載入圖表中...</div>}>
+                <TrendChart data={trend} />
+              </Suspense>
             </GlassPanel>
           </>
         )}
 
-        {/* Footer */}
         <footer className="mt-8 text-center space-y-2">
-          <div className={`flex items-center justify-center gap-4 text-[10px] flex-wrap ${isLight ? 'text-slate-500' : 'text-slate-600'}`}>
-            <span>CWA API: {location?.apiCode}</span>
+          <div className={`flex items-center justify-center gap-4 text-[10px] flex-wrap ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
+            <span>CWA × Open-Meteo 雙源驗證</span>
             <span>·</span>
             <span>{location?.lat.toFixed(4)}°N, {location?.lng.toFixed(4)}°E</span>
             <span>·</span>
             <span>{dataSource === 'CWA' ? '🟢 CWA 即時資料' : targetTime ? '預測模式' : '每60秒自動更新'}</span>
-            {location?.district && <><span>·</span><span>{location.district}</span></>}
           </div>
           <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
-            PPI v2 · 風力55% + 降雨25% + 雲量8% + 體感7% + 地面5%
+            PPI v2 · 風力55% + 降雨25% + 雲量8% + 體感7% + 地面5% · 日變風修正
           </p>
         </footer>
       </div>
