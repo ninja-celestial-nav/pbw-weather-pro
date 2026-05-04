@@ -5,16 +5,16 @@ import { useEffect } from 'react';
 // You can update these IDs if the official live streams change URLs
 const CAMERA_MAP = {
   youth_park: {
-    id: 'Ndo_8RqGQls', // 大稻埕碼頭 (西區/萬華天際線)
-    name: '大稻埕即時影像 (萬華周邊)',
+    url: 'https://tw.live/cam/?id=BOT295', // 青年公園
+    name: '青年公園周邊監視器',
   },
   erchong: {
-    id: 'F_f0hE4XhM0', // 象山/新北大橋 ( placeholder: 台北盆地 )
-    name: '台北盆地即時影像 (三重周邊)',
+    url: 'https://tw.live/cam/?id=NWT0268', // 二重疏洪道
+    name: '二重疏洪道周邊監視器',
   },
   tianmu: {
-    id: 'Q3h2X61y1xQ', // 碧山巖 (北區/士林天母天際線)
-    name: '碧山巖即時影像 (天母周邊)',
+    url: 'https://tw.live/cam/?id=BOT408', // 天母公園
+    name: '天母公園周邊監視器',
   },
 };
 
@@ -73,7 +73,7 @@ export default function LiveCameraViewer({ locationId, isOpen, onClose, isLight 
         <div className="relative w-full aspect-video bg-black">
           {isOpen && (
             <iframe
-              src={`https://www.youtube.com/embed/${cam.id}?autoplay=1&mute=1&playsinline=1`}
+              src={cam.url}
               title="Live Camera"
               className="absolute inset-0 w-full h-full border-0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -84,7 +84,7 @@ export default function LiveCameraViewer({ locationId, isOpen, onClose, isLight 
         
         {/* Footer info */}
         <div className={`p-3 text-[10px] sm:text-xs text-center ${isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-800/50 text-slate-400'}`}>
-          若影像無法載入，可能是官方直播連結已更新。影像來源：YouTube 公開直播頻道。
+          若影像無法載入，請直接前往 <a href={cam.url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">觀看原始網頁</a>
         </div>
       </div>
     </div>
