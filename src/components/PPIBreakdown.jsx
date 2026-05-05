@@ -1,10 +1,10 @@
 import { Wind, CloudRain, Cloud, Thermometer, Droplets } from 'lucide-react';
 
 const metrics = [
-  { key: 'windScore', label: '風力', weight: '55%', icon: Wind, colorFrom: '#ef4444', colorTo: '#22c55e' },
-  { key: 'rainScore', label: '降雨', weight: '25%', icon: CloudRain, colorFrom: '#ef4444', colorTo: '#3b82f6' },
-  { key: 'cloudScore', label: '雲量', weight: '8%', icon: Cloud, colorFrom: '#6b7280', colorTo: '#a78bfa' },
-  { key: 'heatScore', label: '體感', weight: '7%', icon: Thermometer, colorFrom: '#ef4444', colorTo: '#f59e0b' },
+  { key: 'rainScore', label: '降雨', weight: '70%', icon: CloudRain, colorFrom: '#ef4444', colorTo: '#3b82f6' },
+  { key: 'windScore', label: '風力', weight: '15%', icon: Wind, colorFrom: '#ef4444', colorTo: '#22c55e' },
+  { key: 'cloudScore', label: '雲量', weight: '5%', icon: Cloud, colorFrom: '#6b7280', colorTo: '#a78bfa' },
+  { key: 'heatScore', label: '體感', weight: '5%', icon: Thermometer, colorFrom: '#ef4444', colorTo: '#f59e0b' },
   { key: 'groundScore', label: '地面', weight: '5%', icon: Droplets, colorFrom: '#3b82f6', colorTo: '#10b981' },
 ];
 

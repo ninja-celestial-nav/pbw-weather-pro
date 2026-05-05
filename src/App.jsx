@@ -308,7 +308,7 @@ export default function App() {
             <span>{targetTime ? '🕒 預測模式 (Forecast)' : dataSource === 'CWA' ? '🟢 CWA 即時資料' : '每60秒自動更新'}</span>
           </div>
           <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
-            PPI v2 · 風力55% + 降雨25% + 雲量8% + 體感7% + 地面5% · 日變風修正
+            PPI v3 (降雨優先) · 降雨70% + 風力15% + 其他15% · 移除硬性封頂
           </p>
         </footer>
       </div>

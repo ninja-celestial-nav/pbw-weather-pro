@@ -2,13 +2,14 @@
  * Pickleball Playability Index (PPI) Calculator v2
  * 
  * Weights:
- *   - Wind (55%): Ideal < 12km/h, Challenging 12-25km/h, Unplayable > 32km/h
- *   - Rain (25%): Instant 0 if Rain > 0.5mm/hr or PoP > 40%
- *   - Cloud/UV (8%): 40-70% cloud = sweet spot
- *   - Heat (7%): Feels-like > 35°C or < 10°C = penalty
- *   - Ground (5%): Humidity+dewpoint → ground wetness penalty
+ * Weights (Rain-Priority v3):
+ *   - Rain (70%): Main factor. Instant 0 if Rain > 0.8mm/hr or PoP > 70%
+ *   - Wind (15%): Secondary factor. Ideal < 12km/h
+ *   - Cloud/UV (5%): Aesthetic factor.
+ *   - Heat (5%): Comfort factor.
+ *   - Ground (5%): Wetness/Safety factor.
  * 
- * Modifiers: Thunderstorm → instant kill
+ * Modifiers: Thunderstorm penalty, Ground wetness penalty
  */
 
 function calcWindScore(windSpeed, windGust) {
@@ -23,12 +24,12 @@ function calcWindScore(windSpeed, windGust) {
 }
 
 function calcRainScore(rainMm, pop) {
-  // Only zero out if actual rain is significant or PoP is extremely high (85%+)
-  if (rainMm > 0.8 || pop >= 85) return 0;
+  // Only zero out if actual rain is significant or PoP is high (70%+)
+  if (rainMm > 0.8 || pop >= 70) return 0;
 
   let score = 100;
-  if (rainMm > 0) score -= (rainMm / 0.5) * 40;
-  if (pop > 20) score -= ((pop - 20) / 40) * 80;
+  if (rainMm > 0) score -= (rainMm / 0.5) * 50; // More aggressive rain penalty
+  if (pop > 15) score -= ((pop - 15) / 45) * 100; // PoP penalty starts earlier (15%) and reaches 0 at 60%
   return Math.max(0, Math.min(100, score));
 }
 
@@ -117,13 +118,17 @@ export function calculatePPI(weather) {
     // PoP <= 30% 的雷暴預報幾乎只是「可能性」，不扣分
   }
 
-  // Calculate weighted score
-  let score = windScore * 0.55 + rainScore * 0.25 + cloudScore * 0.08 + heatScore * 0.07 + groundScore * 0.05;
+  // Calculate weighted score (Rain-Priority)
+  let score = rainScore * 0.70 + windScore * 0.15 + cloudScore * 0.05 + heatScore * 0.05 + groundScore * 0.05;
 
-  // Ground wetness modifier
-  if (is_ground_wet) score = Math.min(score, 30);
+  // A8: Soft penalties instead of hard caps
+  // Extreme wind penalty
+  if (windScore < 20) score -= 15;
 
-  // Apply thunder penalty (percentage reduction, not instant kill)
+  // Ground wetness penalty
+  if (is_ground_wet) score -= 15;
+
+  // Apply thunder penalty (percentage reduction)
   if (thunderPenalty > 0) {
     score = score * (1 - thunderPenalty);
   }

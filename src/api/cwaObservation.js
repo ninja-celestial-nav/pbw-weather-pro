@@ -61,11 +61,19 @@ function parseObservation(data) {
       if (rain < 0) rain = 0; // Negative means trace or error
       windSpeed = parseFloat(windElem) || 0;
     } else if (station.weatherElement) {
-      // A0003 schema
+      // A0003 schema (Manual stations)
       const wElems = station.weatherElement;
-      const rainElem = wElems.find(e => e.elementName === 'HOUR_24');
+      // Priority: RAIN (60min) > MIN_10 (10min) > others
+      const rainElem = wElems.find(e => e.elementName === 'RAIN') || 
+                       wElems.find(e => e.elementName === 'MIN_10') ||
+                       wElems.find(e => e.elementName === 'NOW');
+      
       const windElem = wElems.find(e => e.elementName === 'WDSD');
+      
       rain = parseFloat(rainElem?.elementValue) || 0;
+      // If it's MIN_10, we might want to scale it to mm/hr, but let's keep it simple for now
+      if (rainElem?.elementName === 'MIN_10') rain = rain * 6; 
+      
       if (rain < 0) rain = 0;
       windSpeed = parseFloat(windElem?.elementValue) || 0;
     }

@@ -64,12 +64,25 @@ function saveHistory(locationId, ppiScore) {
   try {
     const history = loadHistory();
     if (!history[locationId]) history[locationId] = [];
+    
     const now = Date.now();
-    history[locationId].push({ t: now, s: ppiScore });
-    // Keep only last 7 days
-    const cutoff = now - 7 * 24 * 60 * 60 * 1000;
-    history[locationId] = history[locationId].filter(h => h.t > cutoff).slice(-MAX_HISTORY);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    const lastRecord = history[locationId][history[locationId].length - 1];
+    
+    // Only save if:
+    // 1. No previous record
+    // 2. More than 15 minutes have passed
+    // 3. Score changed significantly (>= 5 points)
+    const shouldSave = !lastRecord || 
+                       (now - lastRecord.t > 15 * 60 * 1000) || 
+                       (Math.abs(lastRecord.s - ppiScore) >= 5);
+
+    if (shouldSave) {
+      history[locationId].push({ t: now, s: ppiScore });
+      // Keep only last 7 days
+      const cutoff = now - 7 * 24 * 60 * 60 * 1000;
+      history[locationId] = history[locationId].filter(h => h.t > cutoff).slice(-MAX_HISTORY);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    }
   } catch { /* localStorage full or unavailable */ }
 }
 
@@ -85,7 +98,7 @@ function calculateRadarAnalysis(weather) {
     return { arrivalTime: null, direction: weather.wind_direction, scanDistance, threat: 'none', message: '風速過低，無法計算' };
   }
   const arrivalMinutes = Math.round((scanDistance / windSpeedKmh) * 60);
-  const upwindDirection = (weather.wind_direction + 180) % 360;
+  const upwindDirection = weather.wind_direction; 
   let threat = 'none';
   if (weather.radar_echo > 35) threat = 'high';
   else if (weather.radar_echo > 20) threat = 'medium';

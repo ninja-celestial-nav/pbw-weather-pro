@@ -231,24 +231,39 @@ function parseCWAData(locationData) {
     }
   }
 
-  // PoP (Exhaustive search for 3, 6, 12-hour blocks)
-  const popElements = ['3小時降雨機率', '6小時降雨機率', '12小時降雨機率', '降雨機率', '12小時降雨機率(百分比)'];
-  for (const name of popElements) {
+  // PoP (Precise interval matching to avoid bleeding)
+  const popRecords = [];
+  const popElements = [
+    { name: '3小時降雨機率', interval: 3 },
+    { name: '6小時降雨機率', interval: 6 },
+    { name: '12小時降雨機率', interval: 12 },
+    { name: '12小時降雨機率(百分比)', interval: 12 },
+    { name: '降雨機率', interval: 3 }
+  ];
+
+  for (const { name, interval } of popElements) {
     if (elements[name]) {
       for (const t of elements[name]) {
-        const key = t.DataTime || t.StartTime;
-        if (!key) continue;
+        const startStr = t.StartTime || t.DataTime;
+        const endStr = t.EndTime || t.DataTime;
+        if (!startStr) continue;
+        
+        const start = new Date(startStr.replace(' ', 'T') + '+08:00').getTime();
+        const end = endStr ? new Date(endStr.replace(' ', 'T') + '+08:00').getTime() : start + interval * 3600000;
+        
         const valObj = t.ElementValue[0];
         const val = valObj.ProbabilityOfPrecipitation || valObj.value || valObj.ProbabilityOfPrecipitation6hr || valObj.ProbabilityOfPrecipitation12hr;
         const pop = parseInt(val);
         
-        if (!timeMap.has(key)) timeMap.set(key, {});
-        const currentPop = timeMap.get(key).pop || 0;
-        const newPop = isNaN(pop) ? 0 : pop;
-        timeMap.get(key).pop = Math.max(currentPop, newPop);
+        if (!isNaN(pop)) {
+          popRecords.push({ start, end, pop, interval });
+        }
       }
     }
   }
+
+  // Sort popRecords so shorter intervals can be prioritized easily
+  popRecords.sort((a, b) => a.interval - b.interval);
 
   // Weather phenomenon
   if (elements['天氣現象']) {
@@ -266,7 +281,7 @@ function parseCWAData(locationData) {
     }
   }
 
-  return timeMap;
+  return { timeMap, popRecords };
 }
 
 /**
@@ -277,7 +292,12 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
   const targetHour = targetTime.getHours();
 
   const entries = Array.from(timeMap.entries())
-    .map(([key, val]) => ({ time: new Date(key.replace(' ', 'T') + '+08:00').getTime(), data: val, key }))
+    .map(([key, val]) => {
+      // Robust date parsing for "YYYY-MM-DD HH:mm:ss"
+      const dateStr = key.includes('T') ? key : key.replace(' ', 'T');
+      const time = new Date(dateStr + (dateStr.includes('+') ? '' : '+08:00')).getTime();
+      return { time, data: val, key };
+    })
     .sort((a, b) => a.time - b.time);
 
   if (entries.length === 0) return null;
@@ -324,12 +344,11 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
     windDir = interpField('wind_direction') || 0;
   }
 
-  // Non-numeric fields that apply as a step/block (e.g. PoP, WeatherCode)
-  // We should find the most recent entry <= targetMs, or the very first entry if targetMs is early
+  // Non-numeric fields that apply as a step/block (e.g. WeatherCode)
   function findBlockField(field) {
     let best = undefined;
     let maxTime = -Infinity;
-    const MAX_LOOKBACK_MS = 12 * 60 * 60 * 1000; // 12 hours
+    const MAX_LOOKBACK_MS = 3 * 60 * 60 * 1000; // 3 hours tolerance for forecast blocks
 
     for (const e of entries) {
       if (e.data[field] !== undefined && e.time <= targetMs) {
@@ -344,6 +363,19 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
     return best;
   }
 
+  // PoP: Precise interval matching
+  function findBestPop() {
+    const popRecords = timeMap.popRecords || [];
+    // popRecords is already sorted by interval (3h < 6h < 12h)
+    for (const p of popRecords) {
+      // Use a small buffer (1s) to avoid edge case issues
+      if (targetMs >= p.start - 1000 && targetMs < p.end - 1000) {
+        return p.pop;
+      }
+    }
+    return findBlockField('pop'); // Fallback to block search if no interval match
+  }
+
   const temp = interpField('temp') ?? 25;
   const feelsLike = interpField('feels_like') ?? temp;
   const dewPoint = interpField('dew_point') ?? temp - 5;
@@ -356,7 +388,7 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
 
   const windSpeed = Math.round(rawWindSpeed * windFactor * diurnalFactor * 10) / 10;
   const cloudCov = interpField('cloud_coverage') ?? 50;
-  const pop = findBlockField('pop') ?? 0;
+  const pop = findBestPop() ?? 0;
   const weatherCode = findBlockField('weather_code') ?? 1;
   const weatherText = findBlockField('weather_text') || '';
   const windDirText = findBlockField('wind_direction_text') || '';
@@ -421,7 +453,8 @@ export async function fetchCWAWeather(locationId) {
   }
 
   const locationData = data.records.Locations[0].Location[0];
-  const timeMap = parseCWAData(locationData);
+  const { timeMap, popRecords } = parseCWAData(locationData);
+  timeMap.popRecords = popRecords; // Attach popRecords to the map for interpolation
 
   return { timeMap, district: config.district, raw: locationData };
 }
