@@ -233,17 +233,11 @@ function parseCWAData(locationData) {
 
   // PoP (Precise interval matching to avoid bleeding)
   const popRecords = [];
-  const popElements = [
-    { name: '3小時降雨機率', interval: 3 },
-    { name: '6小時降雨機率', interval: 6 },
-    { name: '12小時降雨機率', interval: 12 },
-    { name: '12小時降雨機率(百分比)', interval: 12 },
-    { name: '降雨機率', interval: 3 }
-  ];
-
-  for (const { name, interval } of popElements) {
-    if (elements[name]) {
-      for (const t of elements[name]) {
+  
+  for (const elName in elements) {
+    if (elName.includes('降雨機率')) {
+      const interval = elName.includes('12') ? 12 : elName.includes('6') ? 6 : 3;
+      for (const t of elements[elName]) {
         const startStr = t.StartTime || t.DataTime;
         const endStr = t.EndTime || t.DataTime;
         if (!startStr) continue;
@@ -252,11 +246,16 @@ function parseCWAData(locationData) {
         const end = endStr ? new Date(endStr.replace(' ', 'T') + '+08:00').getTime() : start + interval * 3600000;
         
         const valObj = t.ElementValue[0];
-        const val = valObj.ProbabilityOfPrecipitation || valObj.value || valObj.ProbabilityOfPrecipitation6hr || valObj.ProbabilityOfPrecipitation12hr;
+        const val = valObj.ProbabilityOfPrecipitation || valObj.value || valObj.ProbabilityOfPrecipitation6hr || valObj.ProbabilityOfPrecipitation12hr || valObj.ProbabilityOfPrecipitation3hr;
         const pop = parseInt(val);
         
         if (!isNaN(pop)) {
           popRecords.push({ start, end, pop, interval });
+          
+          // Also populate timeMap for findBlockField fallback
+          if (!timeMap.has(startStr)) timeMap.set(startStr, {});
+          const currentPop = timeMap.get(startStr).pop || 0;
+          timeMap.get(startStr).pop = Math.max(currentPop, pop);
         }
       }
     }
@@ -369,11 +368,13 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
     // popRecords is already sorted by interval (3h < 6h < 12h)
     for (const p of popRecords) {
       // Use a small buffer (1s) to avoid edge case issues
-      if (targetMs >= p.start - 1000 && targetMs < p.end - 1000) {
+      // Also handle the case where start === end by treating it as a start of a block
+      if (targetMs >= p.start - 1000 && (p.start === p.end ? targetMs < p.start + p.interval * 3600000 : targetMs < p.end - 1000)) {
         return p.pop;
       }
     }
-    return findBlockField('pop'); // Fallback to block search if no interval match
+    const fallback = findBlockField('pop');
+    return fallback !== undefined ? fallback : undefined;
   }
 
   const temp = interpField('temp') ?? 25;
