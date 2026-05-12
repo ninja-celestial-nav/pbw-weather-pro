@@ -17,6 +17,7 @@ import SkeletonLoader from './components/SkeletonLoader';
 import CrossValidationBadge from './components/CrossValidationBadge';
 import ToastContainer, { useToast } from './components/Toast';
 import LiveCameraViewer from './components/LiveCameraViewer';
+import ApiErrorState from './components/ApiErrorState';
 
 // C13: Lazy load the heavy chart component
 const TrendChart = lazy(() => import('./components/TrendChart'));
@@ -243,6 +244,8 @@ export default function App() {
 
         {loading && !weather ? (
           <SkeletonLoader />
+        ) : error && !weather ? (
+          <ApiErrorState isLight={isLight} onRetry={handleRefresh} error={error} />
         ) : (
           <>
             <ThunderstormBanner ppi={ppi} weather={weather} />
