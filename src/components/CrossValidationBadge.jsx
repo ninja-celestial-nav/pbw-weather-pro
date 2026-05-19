@@ -1,16 +1,16 @@
 /**
  * C6: Cross-validation confidence badge
  */
-export default function CrossValidationBadge({ crossValidation }) {
+export default function CrossValidationBadge({ crossValidation, isLight = false }) {
   if (!crossValidation) return null;
 
-  const { confidence, label, color, tempDiff, windDiff, popDiff, openMeteo } = crossValidation;
+  const { confidence, label, color, tempDiff, windDiff, popDiff } = crossValidation;
 
   return (
-    <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl p-4">
+    <div className={`mb-5 rounded-2xl border backdrop-blur-xl p-4 ${isLight ? 'bg-white/80 border-slate-200/60 shadow-sm' : 'border-white/[0.06] bg-white/[0.03]'}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-400 tracking-wide uppercase">🔬 資料交叉驗證</span>
+          <span className={`text-xs font-semibold tracking-wide uppercase ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>🔬 資料交叉驗證</span>
           <span className="text-[9px] text-slate-600">CWA vs Open-Meteo</span>
         </div>
         <div className="flex items-center gap-1.5">

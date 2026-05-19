@@ -5,7 +5,7 @@
 import { MiniWeatherIcon } from './WeatherSummary';
 import { getTaipeiNow } from '../api/cwaApi';
 
-export default function BestTimeBar({ bestTimes, trend, onSelectTime }) {
+export default function BestTimeBar({ bestTimes, trend, onSelectTime, isLight = false }) {
   if (!bestTimes || !bestTimes.allHours?.length) return null;
 
   const { best, topHours, allHours } = bestTimes;
@@ -22,17 +22,19 @@ export default function BestTimeBar({ bestTimes, trend, onSelectTime }) {
     const firstTime = allHours[0]?.targetTime;
     const now = getTaipeiNow();
     const isToday = firstTime?.toDateString() === now.toDateString();
-    const isTomorrow = firstTime?.toDateString() === new Date(now.setDate(now.getDate() + 1)).toDateString();
+    const tomorrowDate = new Date(now);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const isTomorrow = firstTime?.toDateString() === tomorrowDate.toDateString();
     
     const labelPrefix = isToday ? '今日' : isTomorrow ? '明日' : 
                         `${firstTime?.getMonth() + 1}/${firstTime?.getDate()}`;
 
   return (
-    <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl p-4">
+    <div className={`mb-5 rounded-2xl border backdrop-blur-xl p-4 ${isLight ? 'bg-white/80 border-slate-200/60 shadow-sm' : 'border-white/[0.06] bg-white/[0.03]'}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-400 tracking-wide uppercase">⭐ {labelPrefix}最佳時段</span>
-          <span className="text-[8px] text-slate-600">點擊可查看</span>
+          <span className={`text-xs font-semibold tracking-wide uppercase ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>⭐ {labelPrefix}最佳時段</span>
+          <span className={`text-[8px] ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>點擊可查看</span>
         </div>
         {best && (
           <div className="flex items-center gap-1.5 text-[10px]">
@@ -46,7 +48,7 @@ export default function BestTimeBar({ bestTimes, trend, onSelectTime }) {
 
       {/* C1: Clickable hour strip */}
       <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
-        {allHours.map(({ hour, targetTime, ppi, color, category, weather }) => {
+        {allHours.map(({ hour, targetTime, ppi, color, weather }) => {
           const isTop = topHours.some(t => t.hour === hour);
           const isBest = best?.hour === hour;
           return (
@@ -60,7 +62,7 @@ export default function BestTimeBar({ bestTimes, trend, onSelectTime }) {
               `}
             >
               <MiniWeatherIcon code={weather?.weather_code} size={14} />
-              <div className="text-[9px] text-slate-400">{String(hour).padStart(2, '0')}</div>
+              <div className={`text-[9px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{String(hour).padStart(2, '0')}</div>
               <div
                 className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold"
                 style={{ backgroundColor: `${color}20`, color }}

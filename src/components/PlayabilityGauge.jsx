@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export default function PlayabilityGauge({ score = 0, category = '', color = '#666' }) {
+export default function PlayabilityGauge({ score = 0, category = '', color = '#666', isLight = false }) {
   const [animatedScore, setAnimatedScore] = useState(0);
 
   useEffect(() => {
@@ -18,6 +18,7 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
     }
 
     requestAnimationFrame(animate);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- animatedScore is read as a snapshot for animation start; including it would cause infinite loops
   }, [score]);
 
   // SVG gauge parameters
@@ -100,7 +101,7 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
         <path
           d={arcPath(radius, startAngle, endAngle)}
           fill="none"
-          stroke="rgba(255,255,255,0.06)"
+          stroke={isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'}
           strokeWidth="22"
           strokeLinecap="round"
         />
@@ -138,7 +139,7 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
           const outerR = radius + 20;
           const innerR = radius + 14;
           const labelR = outerR + 11;
-          const tickColor = tick <= animatedScore ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)';
+          const tickColor = tick <= animatedScore ? (isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.5)') : (isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)');
           return (
             <g key={tick}>
               <line
@@ -152,7 +153,7 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
               <text
                 x={cx + labelR * Math.cos(angle)}
                 y={cy + labelR * Math.sin(angle)}
-                fill="rgba(255,255,255,0.35)"
+                fill={isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.35)'}
                 fontSize="10"
                 fontWeight="500"
                 textAnchor="middle"
@@ -182,7 +183,7 @@ export default function PlayabilityGauge({ score = 0, category = '', color = '#6
           x={cx}
           y={cy + 42}
           textAnchor="middle"
-          fill="white"
+          fill={isLight ? '#1e293b' : 'white'}
           fontSize="44"
           fontWeight="800"
           fontFamily="Inter, system-ui, sans-serif"

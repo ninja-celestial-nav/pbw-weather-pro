@@ -8,7 +8,7 @@ const metrics = [
   { key: 'groundScore', label: '地面', weight: '5%', icon: Droplets, colorFrom: '#3b82f6', colorTo: '#10b981' },
 ];
 
-export default function PPIBreakdown({ ppi }) {
+export default function PPIBreakdown({ ppi, isLight = false }) {
   if (!ppi) return null;
 
   return (
@@ -30,7 +30,7 @@ export default function PPIBreakdown({ ppi }) {
                 }}
               />
             </div>
-            <span className="text-[10px] font-semibold text-slate-300 w-7 text-right">{value}</span>
+            <span className={`text-[10px] font-semibold w-7 text-right ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{value}</span>
           </div>
         );
       })}

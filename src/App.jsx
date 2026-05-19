@@ -15,7 +15,8 @@ import WeatherSummary from './components/WeatherSummary';
 import BestTimeBar from './components/BestTimeBar';
 import SkeletonLoader from './components/SkeletonLoader';
 import CrossValidationBadge from './components/CrossValidationBadge';
-import ToastContainer, { useToast } from './components/Toast';
+import ToastContainer from './components/Toast';
+import { useToast } from './hooks/useToast';
 import LiveCameraViewer from './components/LiveCameraViewer';
 import ApiErrorState from './components/ApiErrorState';
 
@@ -60,14 +61,6 @@ function useLiveClock() {
   return now;
 }
 
-function relativeTime(date) {
-  if (!date) return '';
-  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (diff < 10) return '剛剛';
-  if (diff < 60) return `${diff}秒前`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}分鐘前`;
-  return `${Math.floor(diff / 3600)}小時前`;
-}
 
 function SectionHeader({ icon: Icon, title, subtitle, isLight }) {
   return (
@@ -105,8 +98,8 @@ export default function App() {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const {
-    weather, ppi, trend, radar, location, loading, lastUpdate,
-    dataSource, error, bestTimes, comparison, crossValidation, ppiHistory,
+    weather, ppi, trend, radar, location, loading,
+    dataSource, error, bestTimes, comparison, crossValidation,
     refresh, locations,
   } = useWeatherData(locationId, targetTime);
 
@@ -235,31 +228,31 @@ export default function App() {
         </header>
 
         <div className="flex justify-center mb-5">
-          <LocationToggle activeLocation={locationId} onToggle={setLocationId} locations={locations} />
+          <LocationToggle activeLocation={locationId} onToggle={setLocationId} locations={locations} isLight={isLight} />
         </div>
 
         <div className="mb-5">
-          <TimePicker targetTime={targetTime} onTimeChange={setTargetTime} />
+          <TimePicker targetTime={targetTime} onTimeChange={setTargetTime} isLight={isLight} />
         </div>
 
         {loading && !weather ? (
-          <SkeletonLoader />
+          <SkeletonLoader isLight={isLight} />
         ) : error && !weather ? (
           <ApiErrorState isLight={isLight} onRetry={handleRefresh} error={error} />
         ) : (
           <>
-            <ThunderstormBanner ppi={ppi} weather={weather} />
-            <WeatherSummary weather={weather} ppi={ppi} />
-            <ComparisonView comparison={comparison} activeLocation={locationId} onSelectLocation={setLocationId} />
-            <BestTimeBar bestTimes={bestTimes} trend={trend} onSelectTime={handleBestTimeSelect} />
-            <CrossValidationBadge crossValidation={crossValidation} />
+            <ThunderstormBanner ppi={ppi} weather={weather} isLight={isLight} />
+            <WeatherSummary weather={weather} ppi={ppi} isLight={isLight} />
+            <ComparisonView comparison={comparison} activeLocation={locationId} onSelectLocation={setLocationId} isLight={isLight} />
+            <BestTimeBar bestTimes={bestTimes} trend={trend} onSelectTime={handleBestTimeSelect} isLight={isLight} />
+            <CrossValidationBadge crossValidation={crossValidation} isLight={isLight} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
               <GlassPanel isLight={isLight}>
                 <SectionHeader icon={Gauge} title="Playability Index" subtitle="適打指數 PPI" isLight={isLight} />
-                <PlayabilityGauge score={ppi?.score || 0} category={ppi?.category || ''} color={ppi?.color || '#666'} />
+                <PlayabilityGauge score={ppi?.score || 0} category={ppi?.category || ''} color={ppi?.color || '#666'} isLight={isLight} />
                 <div className="mt-4">
-                  <PPIBreakdown ppi={ppi} />
+                  <PPIBreakdown ppi={ppi} isLight={isLight} />
                 </div>
               </GlassPanel>
 
@@ -275,7 +268,7 @@ export default function App() {
             </div>
 
             <div className="mb-5">
-              <WeatherCards weather={weather} />
+              <WeatherCards weather={weather} isLight={isLight} />
             </div>
 
             {/* C13: Lazy loaded trend chart */}

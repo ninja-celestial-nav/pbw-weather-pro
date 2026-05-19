@@ -343,14 +343,20 @@ export function useWeatherData(locationId = 'youth_park', targetTime = null) {
       setDataSource('error');
       setLoading(false);
     }
-  }, [locationId, targetTime?.getTime()]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- location is derived from locationId
+  }, [locationId, targetTime]);
 
   useEffect(() => {
-    fetchData();
+    let cancelled = false;
+    const run = async () => {
+      if (!cancelled) await fetchData();
+    };
+    run();
     if (!targetTime) {
       const interval = setInterval(fetchData, 60000);
-      return () => clearInterval(interval);
+      return () => { cancelled = true; clearInterval(interval); };
     }
+    return () => { cancelled = true; };
   }, [fetchData, targetTime]);
 
   return {

@@ -1,4 +1,4 @@
-import { Thermometer, Droplets, Sun, Cloud, Wind } from 'lucide-react';
+import { Thermometer, Droplets, Sun, Cloud } from 'lucide-react';
 
 const cardConfigs = {
   temp: {
@@ -49,7 +49,7 @@ const cardConfigs = {
   },
 };
 
-function SingleCard({ type, value }) {
+function SingleCard({ type, value, isLight }) {
   const config = cardConfigs[type];
   if (!config) return null;
   const Icon = config.icon;
@@ -59,18 +59,18 @@ function SingleCard({ type, value }) {
     <div className={`
       relative overflow-hidden rounded-xl p-3.5
       bg-gradient-to-br ${config.gradient}
-      border border-white/5 backdrop-blur-md
-      hover:border-white/10 transition-all duration-300
+      border ${isLight ? 'border-slate-200/60 shadow-sm' : 'border-white/5'} backdrop-blur-md
+      ${isLight ? 'hover:border-slate-300' : 'hover:border-white/10'} transition-all duration-300
       group hover:scale-[1.02]
     `}>
-      <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/5 blur-xl group-hover:bg-white/8 transition-all"/>
+      <div className={`absolute -top-4 -right-4 w-16 h-16 rounded-full blur-xl transition-all ${isLight ? 'bg-black/3 group-hover:bg-black/5' : 'bg-white/5 group-hover:bg-white/8'}`}/>
 
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] text-slate-400 mb-0.5 tracking-wide uppercase">{config.label}</p>
+          <p className={`text-[10px] mb-0.5 tracking-wide uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{config.label}</p>
           <div className="flex items-baseline gap-1">
-            <span className="text-xl font-bold text-white">{display}</span>
-            <span className="text-xs text-slate-400">{config.unit}</span>
+            <span className={`text-xl font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{display}</span>
+            <span className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-400'}`}>{config.unit}</span>
           </div>
           {config.getLevel && (
             <span className={`text-[9px] font-medium mt-0.5 ${config.getLevelColor(value)}`}>
@@ -84,16 +84,16 @@ function SingleCard({ type, value }) {
   );
 }
 
-export default function WeatherCards({ weather }) {
+export default function WeatherCards({ weather, isLight = false }) {
   if (!weather) return null;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-      <SingleCard type="temp" value={weather.temp} />
-      <SingleCard type="feels_like" value={weather.feels_like} />
-      <SingleCard type="humidity" value={weather.humidity} />
-      <SingleCard type="uv" value={weather.uv_index} />
-      <SingleCard type="cloud" value={weather.cloud_coverage} />
+      <SingleCard type="temp" value={weather.temp} isLight={isLight} />
+      <SingleCard type="feels_like" value={weather.feels_like} isLight={isLight} />
+      <SingleCard type="humidity" value={weather.humidity} isLight={isLight} />
+      <SingleCard type="uv" value={weather.uv_index} isLight={isLight} />
+      <SingleCard type="cloud" value={weather.cloud_coverage} isLight={isLight} />
     </div>
   );
 }

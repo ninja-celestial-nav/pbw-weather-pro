@@ -4,7 +4,7 @@
  * warning: PoP 50-70% — orange banner
  * watch: PoP 30-50% — yellow subtle banner
  */
-export default function ThunderstormBanner({ ppi, weather }) {
+export default function ThunderstormBanner({ ppi, weather, isLight = false }) {
   if (!ppi || !weather) return null;
   const level = ppi.thunderLevel || 'none';
   if (level === 'none') return null;
@@ -51,7 +51,7 @@ export default function ThunderstormBanner({ ppi, weather }) {
   return (
     <div className={`mb-5 relative overflow-hidden rounded-2xl border ${c.border} bg-gradient-to-r ${c.bg} p-4 ${c.animate}`}>
       <div className="relative flex items-center gap-3">
-        <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-lg">
+        <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-lg ${isLight ? 'bg-black/5' : 'bg-white/5'}`}>
           {c.icon}
         </div>
         <div className="flex-1 min-w-0">

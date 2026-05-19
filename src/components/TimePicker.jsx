@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Calendar, Clock, RotateCcw } from 'lucide-react';
 import { getTaipeiNow, toTaipeiDate, getTaipeiHour } from '../api/cwaApi';
 
 const DAY_LABELS = ['今天', '明天', '後天'];
 
-export default function TimePicker({ targetTime, onTimeChange }) {
+export default function TimePicker({ targetTime, onTimeChange, isLight = false }) {
   const now = getTaipeiNow();
   
   // Determine current selection state
@@ -19,6 +19,7 @@ export default function TimePicker({ targetTime, onTimeChange }) {
   const selectedHour = isNow ? getTaipeiHour(now) : getTaipeiHour(selectedDate);
 
   // Generate day options
+  const currentDate = now.getDate();
   const days = useMemo(() => {
     return [0, 1, 2].map(offset => {
       const d = new Date(now);
@@ -30,7 +31,8 @@ export default function TimePicker({ targetTime, onTimeChange }) {
         weekday: d.toLocaleDateString('zh-TW', { weekday: 'short', timeZone: 'Asia/Taipei' }),
       };
     });
-  }, [now.getDate()]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Only recompute when the calendar date changes, not every second
+  }, [currentDate]);
 
   // Generate hour slots
   const hours = useMemo(() => {
@@ -61,12 +63,12 @@ export default function TimePicker({ targetTime, onTimeChange }) {
   }
 
   return (
-    <div className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-4">
+    <div className={`backdrop-blur-xl border rounded-2xl p-4 ${isLight ? 'bg-white/80 border-slate-200/60 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Calendar size={14} className="text-indigo-400" />
-          <span className="text-xs font-medium text-white">預測時間選擇</span>
+          <span className={`text-xs font-medium ${isLight ? 'text-slate-800' : 'text-white'}`}>預測時間選擇</span>
           {!isNow && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/20">
               預測模式
@@ -76,7 +78,7 @@ export default function TimePicker({ targetTime, onTimeChange }) {
         {!isNow && (
           <button
             onClick={handleReset}
-            className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer"
+            className={`flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded-lg cursor-pointer ${isLight ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
           >
             <RotateCcw size={10} />
             回到即時
@@ -96,7 +98,9 @@ export default function TimePicker({ targetTime, onTimeChange }) {
                 flex-1 py-2 px-3 rounded-xl text-center transition-all duration-200 cursor-pointer
                 ${isActive
                   ? 'bg-indigo-600/40 border border-indigo-500/40 text-white shadow-lg shadow-indigo-500/10'
-                  : 'bg-white/[0.03] border border-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                  : isLight
+                    ? 'bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-100'
+                    : 'bg-white/[0.03] border border-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.06]'
                 }
               `}
             >
@@ -115,7 +119,7 @@ export default function TimePicker({ targetTime, onTimeChange }) {
       <div className="grid grid-cols-8 gap-1.5">
         {hours.map(h => {
           const isActive = !isNow && selectedHour === h;
-          const isPast = selectedDayOffset === 0 && h < now.getHours();
+          const isPast = selectedDayOffset === 0 && h < getTaipeiHour(now);
           // Color code by time of day
           const period = h < 10 ? 'text-amber-400' : h < 14 ? 'text-yellow-300' : h < 17 ? 'text-orange-400' : 'text-indigo-300';
           
@@ -129,8 +133,10 @@ export default function TimePicker({ targetTime, onTimeChange }) {
                 ${isActive
                   ? 'bg-indigo-600/50 border border-indigo-500/40 text-white'
                   : isPast
-                    ? 'bg-white/[0.01] text-slate-700 cursor-not-allowed'
-                    : `bg-white/[0.02] border border-transparent hover:border-white/10 ${period} hover:bg-white/[0.05]`
+                    ? isLight ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-white/[0.01] text-slate-700 cursor-not-allowed'
+                    : isLight
+                      ? `bg-slate-50 border border-transparent hover:border-slate-200 ${period} hover:bg-slate-100`
+                      : `bg-white/[0.02] border border-transparent hover:border-white/10 ${period} hover:bg-white/[0.05]`
                 }
               `}
             >
@@ -141,11 +147,11 @@ export default function TimePicker({ targetTime, onTimeChange }) {
       </div>
 
       {/* Current selection display */}
-      <div className="mt-3 pt-3 border-t border-white/[0.04] flex items-center justify-center gap-2">
+      <div className={`mt-3 pt-3 border-t flex items-center justify-center gap-2 ${isLight ? 'border-slate-200' : 'border-white/[0.04]'}`}>
         <div className={`w-1.5 h-1.5 rounded-full ${isNow ? 'bg-emerald-400 animate-pulse' : 'bg-indigo-400'}`} />
-        <span className="text-[11px] text-slate-400">
+        <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
           {isNow ? (
-            <>即時分析 · <span className="text-white">{String(now.getHours()).padStart(2,'0')}:{String(now.getMinutes()).padStart(2,'0')}</span></>
+            <>即時分析 · <span className={isLight ? 'text-slate-800' : 'text-white'}>{String(getTaipeiHour(now)).padStart(2,'0')}:{String(now.getMinutes()).padStart(2,'0')}</span></>
           ) : (
             <>預測分析 · <span className="text-indigo-300">{days[selectedDayOffset]?.label} {String(selectedHour).padStart(2,'0')}:00</span></>
           )}

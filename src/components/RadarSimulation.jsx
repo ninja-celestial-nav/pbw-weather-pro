@@ -6,35 +6,35 @@ export default function RadarSimulation({ radar, weather }) {
   const animRef = useRef();
 
   // Generate cloud cells
+  const windDirection = weather?.wind_direction;
+  const radarEcho = weather?.radar_echo;
+  /* eslint-disable react-hooks/set-state-in-effect -- Cloud generation uses Math.random() which cannot run in useMemo */
   useEffect(() => {
-    if (!weather || weather.radar_echo <= 5) {
+    if (!weather || radarEcho <= 5) {
       setClouds([]);
       return;
     }
     
-    // Meteorological Wind Direction (0=N, 90=E) to SVG Angle (radians)
-    // Upwind direction is the direction the wind is blowing FROM.
-    // SVG 0rad = 3 o'clock (East), -Math.PI/2 = 12 o'clock (North)
-    const windDir = weather?.wind_direction ?? 0;
+    const windDir = windDirection ?? 0;
     const upwindRad = (windDir - 90) * (Math.PI / 180);
     
     const newClouds = [];
-    const count = weather.radar_echo > 30 ? 6 : weather.radar_echo > 15 ? 4 : 2;
+    const count = radarEcho > 30 ? 6 : radarEcho > 15 ? 4 : 2;
     
     for (let i = 0; i < count; i++) {
-      // Position clouds on the outer ring in the upwind direction
       const dist = 70 + Math.random() * 30;
-      const spread = (Math.random() - 0.5) * 1.0; // wider spread
+      const spread = (Math.random() - 0.5) * 1.0;
       newClouds.push({
         x: 120 + dist * Math.cos(upwindRad + spread),
         y: 120 + dist * Math.sin(upwindRad + spread),
         r: 10 + Math.random() * 15,
-        intensity: 0.15 + (weather.radar_echo / 70) * 0.5,
+        intensity: 0.15 + (radarEcho / 70) * 0.5,
         id: i,
       });
     }
     setClouds(newClouds);
-  }, [weather?.wind_direction, weather?.radar_echo]);
+  }, [windDirection, radarEcho]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Sweep animation
   useEffect(() => {

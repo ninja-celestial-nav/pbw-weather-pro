@@ -2,7 +2,7 @@
  * B1: 3-location comparison view
  * C9: 24hr PPI sparkline in each card
  */
-export default function ComparisonView({ comparison, activeLocation, onSelectLocation }) {
+export default function ComparisonView({ comparison, activeLocation, onSelectLocation, isLight = false }) {
   if (!comparison || Object.keys(comparison).length < 2) return null;
 
   const locations = Object.entries(comparison).sort((a, b) => b[1].ppi.score - a[1].ppi.score);
@@ -11,8 +11,8 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
   return (
     <div className="mb-5">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-semibold text-slate-400 tracking-wide uppercase">📍 場地比較</span>
-        <span className="text-[9px] text-slate-600">即時 PPI 排名</span>
+        <span className={`text-xs font-semibold tracking-wide uppercase ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>📍 場地比較</span>
+        <span className={`text-[9px] ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>即時 PPI 排名</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {locations.map(([locId, data]) => {
@@ -29,7 +29,9 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
                 border backdrop-blur-md group
                 ${isActive
                   ? 'border-indigo-500/40 bg-indigo-500/10 shadow-lg shadow-indigo-500/10'
-                  : 'border-white/[0.06] bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.05]'}
+                  : isLight
+                    ? 'border-slate-200 bg-white/80 hover:border-slate-300 hover:bg-white shadow-sm'
+                    : 'border-white/[0.06] bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.05]'}
               `}
             >
               {/* C12: Venue photo background with gradient overlay */}
@@ -37,7 +39,7 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
                 className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity bg-cover bg-center"
                 style={{ backgroundImage: `url(/images/${locId}.png)` }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+              <div className={`absolute inset-0 bg-gradient-to-t ${isLight ? 'from-white/80 via-white/40 to-transparent' : 'from-black/80 via-black/40 to-transparent'}`} />
               
               <div className="relative z-10">
                 {isBest && (
@@ -59,28 +61,28 @@ export default function ComparisonView({ comparison, activeLocation, onSelectLoc
                       style={{ filter: `drop-shadow(0 0 4px ${ppi.color}40)` }}
                     />
                   </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
+                  <span className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
                     {ppi.score}
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-white truncate">{location.nameShort}</p>
+                  <p className={`text-[11px] font-semibold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{location.nameShort}</p>
                   <p className="text-[9px] text-slate-500 truncate">{location.terrain}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[9px]">
                 <div className="text-slate-500">風速</div>
-                <div className="text-right text-slate-300">{weather.wind_speed} km/h</div>
+                <div className={`text-right ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{weather.wind_speed} km/h</div>
                 <div className="text-slate-500">降雨</div>
-                <div className="text-right text-slate-300">{weather.pop}%</div>
+                <div className={`text-right ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{weather.pop}%</div>
                 <div className="text-slate-500">溫度</div>
-                <div className="text-right text-slate-300">{weather.temp}°C</div>
+                <div className={`text-right ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{weather.temp}°C</div>
               </div>
 
               {/* C9: Mini sparkline */}
               {history && history.length > 3 && (
-                <div className="mt-2 pt-1.5 border-t border-white/[0.04]">
+                <div className={`mt-2 pt-1.5 border-t ${isLight ? 'border-slate-200/60' : 'border-white/[0.04]'}`}>
                   <Sparkline data={history.slice(-24)} color={ppi.color} />
                 </div>
               )}

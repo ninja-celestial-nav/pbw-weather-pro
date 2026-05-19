@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function WindCompass({ windDirection = 0, windSpeed = 0, windGust = 0, courtOrientation = 0 }) {
   const [animDir, setAnimDir] = useState(windDirection);
@@ -15,6 +15,7 @@ export default function WindCompass({ windDirection = 0, windSpeed = 0, windGust
       if (p < 1) requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- animDir is intentionally read as snapshot for animation start
   }, [windDirection]);
 
   const cx = 120, cy = 120, r = 85;

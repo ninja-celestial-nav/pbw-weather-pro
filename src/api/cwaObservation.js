@@ -3,6 +3,8 @@
  * Real-time 10-minute rain and wind observations
  */
 
+import { CWA_API_KEY } from './cwaApi';
+
 const IS_DEV = import.meta.env.DEV;
 const CWA_BASE_DEV = '/cwa-api';
 const CWA_BASE_PROD = '/api/cwa';
@@ -16,18 +18,24 @@ const STATION_MAP = {
 
 export async function fetchObservation(locationId) {
   try {
-    const CWA_API_KEY = 'CWA-39834882-92D7-421E-A5B6-EE3BBF5F5E51';
     const stationName = STATION_MAP[locationId] || '臺北';
     const baseUrl = IS_DEV ? CWA_BASE_DEV : CWA_BASE_PROD;
     
     // O-A0001-001: 自動氣象站-氣象觀測資料
-    const url = `${baseUrl}?apiCode=O-A0001-001&locationName=${encodeURIComponent(stationName)}&Authorization=${CWA_API_KEY}`;
+    let url;
+    if (IS_DEV) {
+      url = `${baseUrl}/O-A0001-001?Authorization=${CWA_API_KEY}&locationName=${encodeURIComponent(stationName)}&format=JSON`;
+    } else {
+      url = `${baseUrl}?apiCode=O-A0001-001&locationName=${encodeURIComponent(stationName)}`;
+    }
     
     const response = await fetch(url);
     if (!response.ok) {
       // Fallback to O-A0003-001 if station not found in A0001
       if (stationName === '臺北') {
-        const fbUrl = `${baseUrl}?apiCode=O-A0003-001&locationName=臺北&Authorization=${CWA_API_KEY}`;
+        const fbUrl = IS_DEV
+          ? `${baseUrl}/O-A0003-001?Authorization=${CWA_API_KEY}&locationName=臺北&format=JSON`
+          : `${baseUrl}?apiCode=O-A0003-001&locationName=臺北`;
         const fbRes = await fetch(fbUrl);
         if (fbRes.ok) return parseObservation(await fbRes.json());
       }
@@ -85,7 +93,7 @@ function parseObservation(data) {
       wind_speed: Math.round(windSpeed * 3.6 * 10) / 10,
       timestamp: new Date().getTime(),
     };
-  } catch (err) {
+  } catch {
     return null;
   }
 }

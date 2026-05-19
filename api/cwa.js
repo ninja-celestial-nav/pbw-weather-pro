@@ -28,7 +28,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing apiCode parameter' });
   }
 
-  const CWA_API_KEY = process.env.CWA_API_KEY || 'CWA-39834882-92D7-421E-A5B6-EE3BBF5F5E51';
+  const CWA_API_KEY = process.env.CWA_API_KEY;
+  if (!CWA_API_KEY) {
+    console.error('[CWA API Proxy] CWA_API_KEY environment variable is not set');
+    return res.status(500).json({ error: 'Server configuration error: missing API key' });
+  }
   const url = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${apiCode}?Authorization=${CWA_API_KEY}&format=JSON${locationName ? `&LocationName=${encodeURIComponent(locationName)}` : ''}`;
 
   try {

@@ -2,7 +2,7 @@
  * B2: Weather summary card with CWA text + AI advice
  * B3: Animated weather icon
  */
-import { useMemo } from 'react';
+
 
 /** B3: Animated SVG weather icons */
 function WeatherIcon({ code, size = 48 }) {
@@ -89,25 +89,25 @@ export function MiniWeatherIcon({ code, size = 20 }) {
   if (c <= 3) return <span style={{ fontSize: size * 0.8 }}>🌤️</span>;
   if (c <= 6) return <span style={{ fontSize: size * 0.8 }}>☁️</span>;
   if (c === 7) return <span style={{ fontSize: size * 0.8 }}>🌥️</span>;
-  if (c >= 14 && c <= 16 || c >= 19 && c <= 20 || c === 23 || c === 26 || c >= 31) return <span style={{ fontSize: size * 0.8 }}>⛈️</span>;
+  if ((c >= 14 && c <= 16) || (c >= 19 && c <= 20) || c === 23 || c === 26 || c >= 31) return <span style={{ fontSize: size * 0.8 }}>⛈️</span>;
   if (c >= 8) return <span style={{ fontSize: size * 0.8 }}>🌧️</span>;
   return <span style={{ fontSize: size * 0.8 }}>🌤️</span>;
 }
 
-export default function WeatherSummary({ weather, ppi }) {
+export default function WeatherSummary({ weather, ppi, isLight = false }) {
   if (!weather || !ppi) return null;
 
   return (
-    <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl p-4 flex items-center gap-4">
+    <div className={`mb-5 rounded-2xl border backdrop-blur-xl p-4 flex items-center gap-4 ${isLight ? 'bg-white/80 border-slate-200/60 shadow-sm' : 'border-white/[0.06] bg-white/[0.03]'}`}>
       <WeatherIcon code={weather.weather_code} size={56} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-semibold text-white">{weather.weather_text || '—'}</span>
+          <span className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{weather.weather_text || '—'}</span>
           {weather.is_thunder && (
             <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] font-bold border border-amber-500/30">⚡ 雷</span>
           )}
         </div>
-        <p className="text-xs text-slate-400">{ppi.advice}</p>
+        <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{ppi.advice}</p>
         {weather.comfort_desc && (
           <p className="text-[10px] text-slate-500 mt-0.5">舒適度：{weather.comfort_desc} · 體感 {weather.feels_like}°C</p>
         )}

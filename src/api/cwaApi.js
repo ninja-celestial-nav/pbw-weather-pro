@@ -4,7 +4,7 @@
  * v2: Linear interpolation, smart gust/rain estimation, thunderstorm detection
  */
 
-const CWA_API_KEY = 'CWA-39834882-92D7-421E-A5B6-EE3BBF5F5E51';
+const CWA_API_KEY = import.meta.env.VITE_CWA_API_KEY || '';
 const IS_DEV = import.meta.env.DEV;
 const CWA_BASE_DEV = '/cwa-api';
 const CWA_BASE_PROD = '/api/cwa';
@@ -84,7 +84,7 @@ function getWeatherCodeInfo(code) {
 /** Dynamic gust estimation based on terrain and time of day */
 export function estimateGust(windSpeedKmh, windFactor, hour) {
   // Higher gust ratio for exposed terrain and afternoon convection
-  let gustRatio = 1.3; // base
+  let gustRatio;
 
   if (windFactor >= 1.2) gustRatio = 1.8;       // Riverside/open
   else if (windFactor >= 0.8) gustRatio = 1.5;   // Semi-sheltered
@@ -334,7 +334,7 @@ export function getWeatherAtTime(timeMap, targetTime, windFactor = 1.0) {
   }
 
   // Wind direction: angle interpolation
-  let windDir = 0;
+  let windDir;
   const wd1 = before.data.wind_direction;
   const wd2 = after.data.wind_direction;
   if (wd1 !== undefined && wd2 !== undefined) {
