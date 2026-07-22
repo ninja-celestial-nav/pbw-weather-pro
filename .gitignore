@@ -8,3 +8,5 @@ out.txt
 test.py
 *.log
 .vercel
+
+.vercel

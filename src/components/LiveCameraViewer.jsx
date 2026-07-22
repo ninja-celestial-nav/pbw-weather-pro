@@ -1,22 +1,129 @@
-import { X, Video } from 'lucide-react';
-import { useEffect } from 'react';
+import { X, Video, AlertTriangle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import Hls from 'hls.js';
 
-// Maps location IDs to YouTube Live Video IDs
-// You can update these IDs if the official live streams change URLs
+// Maps location IDs to government CCTV HLS streams
+// These are the actual m3u8 sources that tw.live uses internally.
+// BOT = 台北市交通管制工程處, NWT = 新北市政府交通局
 const CAMERA_MAP = {
   youth_park: {
-    url: 'https://tw.live/cam/?id=BOT295', // 青年公園
-    name: '青年公園周邊監視器',
+    streamUrl: 'https://jtmctrafficcctv5.gov.taipei/NVR/5a1b2d3d-04ac-4558-9dfe-551afab49ce8/live.m3u8',
+    name: '295-萬大路-東園街口',
+    subtitle: '台北市萬華區 · 青年公園周邊',
+    source: '台北市交通管制工程處',
+    fallbackUrl: 'https://tw.live/cam/?id=BOT295',
   },
   erchong: {
-    url: 'https://tw.live/cam/?id=NWT0268', // 二重疏洪道
-    name: '二重疏洪道周邊監視器',
+    streamUrl: 'https://cctvatis4.ntpc.gov.tw/hls/C000268/live.m3u8',
+    name: '光復路2段-疏洪西路',
+    subtitle: '新北市三重區 · 二重疏洪道周邊',
+    source: '新北市政府交通局',
+    fallbackUrl: 'https://tw.live/cam/?id=NWT0268',
   },
   tianmu: {
-    url: 'https://tw.live/cam/?id=BOT408', // 天母公園
-    name: '天母公園周邊監視器',
+    streamUrl: 'https://jtmctrafficcctv4.gov.taipei/NVR/7fad9da7-4775-4119-95fc-1f78b7bb7877/live.m3u8',
+    name: '408-石牌路2段-天母西路',
+    subtitle: '台北市北投區 · 天母周邊',
+    source: '台北市交通管制工程處',
+    fallbackUrl: 'https://tw.live/cam/?id=BOT408',
   },
 };
+
+function HlsPlayer({ streamUrl, isLight }) {
+  const videoRef = useRef(null);
+  const hlsRef = useRef(null);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !streamUrl) return;
+
+    setError(false);
+    setLoading(true);
+
+    // If the browser natively supports HLS (Safari)
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = streamUrl;
+      video.addEventListener('loadeddata', () => setLoading(false));
+      video.addEventListener('error', () => {
+        setError(true);
+        setLoading(false);
+      });
+      video.play().catch(() => {});
+      return () => {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      };
+    }
+
+    // Use HLS.js for other browsers
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+      });
+      hlsRef.current = hls;
+
+      hls.loadSource(streamUrl);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setLoading(false);
+        video.play().catch(() => {});
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          setError(true);
+          setLoading(false);
+          hls.destroy();
+        }
+      });
+
+      return () => {
+        hls.destroy();
+        hlsRef.current = null;
+      };
+    }
+
+    // Fallback: no HLS support
+    setError(true);
+    setLoading(false);
+  }, [streamUrl]);
+
+  if (error) {
+    return (
+      <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 ${isLight ? 'bg-slate-100' : 'bg-slate-900'}`}>
+        <AlertTriangle size={32} className="text-amber-500" />
+        <p className={`text-sm ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+          影像暫時無法連線
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-8 h-8 border-2 border-white/20 border-t-white/80 rounded-full animate-spin" />
+            <span className="text-xs text-slate-400">正在連線串流...</span>
+          </div>
+        </div>
+      )}
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-contain bg-black"
+        autoPlay
+        muted
+        playsInline
+      />
+    </>
+  );
+}
 
 export default function LiveCameraViewer({ locationId, isOpen, onClose, isLight }) {
   // Prevent body scrolling when modal is open
@@ -57,7 +164,7 @@ export default function LiveCameraViewer({ locationId, isOpen, onClose, isLight 
                 {cam.name}
               </h3>
               <p className="text-[10px] sm:text-xs text-slate-500">
-                Live Public Camera · 僅供天氣與雲層參考
+                {cam.subtitle}
               </p>
             </div>
           </div>
@@ -72,19 +179,13 @@ export default function LiveCameraViewer({ locationId, isOpen, onClose, isLight 
         {/* 16:9 Video Container */}
         <div className="relative w-full aspect-video bg-black">
           {isOpen && (
-            <iframe
-              src={cam.url}
-              title="Live Camera"
-              className="absolute inset-0 w-full h-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+            <HlsPlayer streamUrl={cam.streamUrl} isLight={isLight} />
           )}
         </div>
         
         {/* Footer info */}
         <div className={`p-3 text-[10px] sm:text-xs text-center ${isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-800/50 text-slate-400'}`}>
-          若影像無法載入，請直接前往 <a href={cam.url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">觀看原始網頁</a>
+          影像來源：{cam.source}｜若無法載入，請前往 <a href={cam.fallbackUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">tw.live 觀看</a>
         </div>
       </div>
     </div>
