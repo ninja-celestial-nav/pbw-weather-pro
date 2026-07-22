@@ -7,11 +7,12 @@ import Hls from 'hls.js';
 // BOT = 台北市交通管制工程處, NWT = 新北市政府交通局
 const CAMERA_MAP = {
   youth_park: {
-    streamUrl: 'https://cctvatis4.ntpc.gov.tw/hls/C000270/live.m3u8',
-    name: '橋和路-中山路2段332巷口',
-    subtitle: '新北市中和區 · 近青年公園對岸',
-    source: '新北市政府交通局',
-    fallbackUrl: 'https://tw.live/cam/?id=NWT0270',
+    streamUrl: 'DYNAMIC_TAIPEI_ITS',
+    cctvId: '295',
+    name: '295-萬大路-東園街口',
+    subtitle: '台北市萬華區 · 青年公園周邊',
+    source: '台北市交通管制工程處',
+    fallbackUrl: 'https://tw.live/cam/?id=BOT295',
   },
   erchong: {
     streamUrl: 'https://cctvatis4.ntpc.gov.tw/hls/C000268/live.m3u8',
@@ -21,11 +22,12 @@ const CAMERA_MAP = {
     fallbackUrl: 'https://tw.live/cam/?id=NWT0268',
   },
   tianmu: {
-    streamUrl: 'https://cctvatis4.ntpc.gov.tw/hls/C000269/live.m3u8',
-    name: '成泰路4段22巷口',
-    subtitle: '新北市五股區 · 近北投對岸',
-    source: '新北市政府交通局',
-    fallbackUrl: 'https://tw.live/cam/?id=NWT0269',
+    streamUrl: 'DYNAMIC_TAIPEI_ITS',
+    cctvId: '408',
+    name: '408-石牌路2段-天母西路',
+    subtitle: '台北市北投區 · 天母周邊',
+    source: '台北市交通管制工程處',
+    fallbackUrl: 'https://tw.live/cam/?id=BOT408',
   },
 };
 
@@ -126,6 +128,8 @@ function HlsPlayer({ streamUrl, isLight }) {
 }
 
 export default function LiveCameraViewer({ locationId, isOpen, onClose, isLight }) {
+  const [actualStreamUrl, setActualStreamUrl] = useState(null);
+  
   // Prevent body scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -138,9 +142,43 @@ export default function LiveCameraViewer({ locationId, isOpen, onClose, isLight 
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const cam = CAMERA_MAP[locationId] || CAMERA_MAP.youth_park;
+
+  // Dynamically fetch Taipei ITS cameras to avoid expired m3u8 URLs
+  useEffect(() => {
+    if (!isOpen) {
+      setActualStreamUrl(null);
+      return;
+    }
+
+    if (cam.streamUrl === 'DYNAMIC_TAIPEI_ITS') {
+      const fetchCctv = async () => {
+        try {
+          const res = await fetch('https://itsapi.taipei.gov.tw/TPTS_API/roadInformation/CCTVByLBS', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'distance=10000000&language=zh-tw&lat=25.04&lng=121.51'
+          });
+          const data = await res.json();
+          const targetCctv = data?.locations?.find(c => c.cctvId === cam.cctvId);
+          if (targetCctv && targetCctv.videoStreamURL) {
+            setActualStreamUrl(targetCctv.videoStreamURL);
+          } else {
+            // Fallback to null will trigger error state in HlsPlayer
+            setActualStreamUrl(null);
+          }
+        } catch (e) {
+          console.error('Failed to fetch ITS API:', e);
+          setActualStreamUrl(null);
+        }
+      };
+      fetchCctv();
+    } else {
+      setActualStreamUrl(cam.streamUrl);
+    }
+  }, [isOpen, cam]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
@@ -178,8 +216,14 @@ export default function LiveCameraViewer({ locationId, isOpen, onClose, isLight 
 
         {/* 16:9 Video Container */}
         <div className="relative w-full aspect-video bg-black">
-          {isOpen && (
-            <HlsPlayer streamUrl={cam.streamUrl} isLight={isLight} />
+          {isOpen && actualStreamUrl && (
+            <HlsPlayer streamUrl={actualStreamUrl} isLight={isLight} />
+          )}
+          {isOpen && !actualStreamUrl && cam.streamUrl === 'DYNAMIC_TAIPEI_ITS' && (
+             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+               <div className="w-8 h-8 rounded-full border-2 border-slate-500 border-t-white animate-spin" />
+               <p className="text-sm text-slate-400">正在取得最新即時影像網址...</p>
+             </div>
           )}
         </div>
         
