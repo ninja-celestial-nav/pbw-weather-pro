@@ -7,11 +7,11 @@ import Hls from 'hls.js';
 // BOT = 台北市交通管制工程處, NWT = 新北市政府交通局
 const CAMERA_MAP = {
   youth_park: {
-    streamUrl: 'https://jtmctrafficcctv5.gov.taipei/NVR/5a1b2d3d-04ac-4558-9dfe-551afab49ce8/live.m3u8',
-    name: '295-萬大路-東園街口',
-    subtitle: '台北市萬華區 · 青年公園周邊',
-    source: '台北市交通管制工程處',
-    fallbackUrl: 'https://tw.live/cam/?id=BOT295',
+    streamUrl: 'https://cctvatis4.ntpc.gov.tw/hls/C000270/live.m3u8',
+    name: '橋和路-中山路2段332巷口',
+    subtitle: '新北市中和區 · 近青年公園對岸',
+    source: '新北市政府交通局',
+    fallbackUrl: 'https://tw.live/cam/?id=NWT0270',
   },
   erchong: {
     streamUrl: 'https://cctvatis4.ntpc.gov.tw/hls/C000268/live.m3u8',
@@ -21,11 +21,11 @@ const CAMERA_MAP = {
     fallbackUrl: 'https://tw.live/cam/?id=NWT0268',
   },
   tianmu: {
-    streamUrl: 'https://jtmctrafficcctv4.gov.taipei/NVR/7fad9da7-4775-4119-95fc-1f78b7bb7877/live.m3u8',
-    name: '408-石牌路2段-天母西路',
-    subtitle: '台北市北投區 · 天母周邊',
-    source: '台北市交通管制工程處',
-    fallbackUrl: 'https://tw.live/cam/?id=BOT408',
+    streamUrl: 'https://cctvatis4.ntpc.gov.tw/hls/C000269/live.m3u8',
+    name: '成泰路4段22巷口',
+    subtitle: '新北市五股區 · 近北投對岸',
+    source: '新北市政府交通局',
+    fallbackUrl: 'https://tw.live/cam/?id=NWT0269',
   },
 };
 
